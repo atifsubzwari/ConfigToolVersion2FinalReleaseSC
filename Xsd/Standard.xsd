@@ -1,0 +1,631 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<xs:schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="http://autosar.org/schema/r4.0" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="AUTOSAR">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="AR-PACKAGES">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element maxOccurs="unbounded" name="AR-PACKAGE">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="SHORT-NAME" type="xs:string" />
+                    <xs:element name="ELEMENTS">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="ECUC-MODULE-CONFIGURATION-VALUES">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element name="SHORT-NAME" type="xs:string" />
+                                <xs:element name="DEFINITION-REF">
+                                  <xs:complexType>
+                                    <xs:simpleContent>
+                                      <xs:extension base="xs:string">
+                                        <xs:attribute name="DEST" type="xs:string" use="required" />
+                                      </xs:extension>
+                                    </xs:simpleContent>
+                                  </xs:complexType>
+                                </xs:element>
+                                <xs:element minOccurs="0" name="IMPLEMENTATION-CONFIG-VARIANT" type="xs:string" />
+                                <xs:element minOccurs="0" name="MODULE-DESCRIPTION-REF">
+                                  <xs:complexType>
+                                    <xs:simpleContent>
+                                      <xs:extension base="xs:string">
+                                        <xs:attribute name="DEST" type="xs:string" use="required" />
+                                      </xs:extension>
+                                    </xs:simpleContent>
+                                  </xs:complexType>
+                                </xs:element>
+                                <xs:element minOccurs="0" name="CONTAINERS">
+                                  <xs:complexType>
+                                    <xs:sequence>
+                                      <xs:element maxOccurs="unbounded" name="ECUC-CONTAINER-VALUE">
+                                        <xs:complexType>
+                                          <xs:sequence>
+                                            <xs:element name="SHORT-NAME" type="xs:string" />
+                                            <xs:element name="DEFINITION-REF">
+                                              <xs:complexType>
+                                                <xs:simpleContent>
+                                                  <xs:extension base="xs:string">
+                                                    <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                  </xs:extension>
+                                                </xs:simpleContent>
+                                              </xs:complexType>
+                                            </xs:element>
+                                            <xs:element minOccurs="0" name="PARAMETER-VALUES">
+                                              <xs:complexType>
+                                                <xs:sequence>
+                                                  <xs:choice maxOccurs="unbounded">
+                                                    <xs:element name="ECUC-NUMERICAL-PARAM-VALUE">
+                                                      <xs:complexType>
+                                                        <xs:sequence>
+                                                          <xs:element name="DEFINITION-REF">
+                                                            <xs:complexType>
+                                                              <xs:simpleContent>
+                                                                <xs:extension base="xs:string">
+                                                                  <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                </xs:extension>
+                                                              </xs:simpleContent>
+                                                            </xs:complexType>
+                                                          </xs:element>
+                                                          <xs:element name="VALUE" type="xs:float" />
+                                                        </xs:sequence>
+                                                      </xs:complexType>
+                                                    </xs:element>
+                                                    <xs:element maxOccurs="unbounded" name="ECUC-TEXTUAL-PARAM-VALUE">
+                                                      <xs:complexType>
+                                                        <xs:sequence>
+                                                          <xs:element name="DEFINITION-REF">
+                                                            <xs:complexType>
+                                                              <xs:simpleContent>
+                                                                <xs:extension base="xs:string">
+                                                                  <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                </xs:extension>
+                                                              </xs:simpleContent>
+                                                            </xs:complexType>
+                                                          </xs:element>
+                                                          <xs:element name="VALUE" type="xs:string" />
+                                                        </xs:sequence>
+                                                      </xs:complexType>
+                                                    </xs:element>
+                                                  </xs:choice>
+                                                </xs:sequence>
+                                              </xs:complexType>
+                                            </xs:element>
+                                            <xs:element minOccurs="0" name="REFERENCE-VALUES">
+                                              <xs:complexType>
+                                                <xs:sequence>
+                                                  <xs:element maxOccurs="unbounded" name="ECUC-REFERENCE-VALUE">
+                                                    <xs:complexType>
+                                                      <xs:sequence>
+                                                        <xs:element name="DEFINITION-REF">
+                                                          <xs:complexType>
+                                                            <xs:simpleContent>
+                                                              <xs:extension base="xs:string">
+                                                                <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                              </xs:extension>
+                                                            </xs:simpleContent>
+                                                          </xs:complexType>
+                                                        </xs:element>
+                                                        <xs:element name="VALUE-REF">
+                                                          <xs:complexType>
+                                                            <xs:simpleContent>
+                                                              <xs:extension base="xs:string">
+                                                                <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                              </xs:extension>
+                                                            </xs:simpleContent>
+                                                          </xs:complexType>
+                                                        </xs:element>
+                                                      </xs:sequence>
+                                                    </xs:complexType>
+                                                  </xs:element>
+                                                </xs:sequence>
+                                              </xs:complexType>
+                                            </xs:element>
+                                            <xs:element minOccurs="0" name="SUB-CONTAINERS">
+                                              <xs:complexType>
+                                                <xs:sequence>
+                                                  <xs:element maxOccurs="unbounded" name="ECUC-CONTAINER-VALUE">
+                                                    <xs:complexType>
+                                                      <xs:sequence>
+                                                        <xs:element name="SHORT-NAME" type="xs:string" />
+                                                        <xs:element name="DEFINITION-REF">
+                                                          <xs:complexType>
+                                                            <xs:simpleContent>
+                                                              <xs:extension base="xs:string">
+                                                                <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                              </xs:extension>
+                                                            </xs:simpleContent>
+                                                          </xs:complexType>
+                                                        </xs:element>
+                                                        <xs:element minOccurs="0" name="PARAMETER-VALUES">
+                                                          <xs:complexType>
+                                                            <xs:sequence>
+                                                              <xs:choice maxOccurs="unbounded">
+                                                                <xs:element name="ECUC-NUMERICAL-PARAM-VALUE">
+                                                                  <xs:complexType>
+                                                                    <xs:sequence>
+                                                                      <xs:element name="DEFINITION-REF">
+                                                                        <xs:complexType>
+                                                                          <xs:simpleContent>
+                                                                            <xs:extension base="xs:string">
+                                                                              <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                            </xs:extension>
+                                                                          </xs:simpleContent>
+                                                                        </xs:complexType>
+                                                                      </xs:element>
+                                                                      <xs:element name="VALUE" type="xs:double" />
+                                                                    </xs:sequence>
+                                                                  </xs:complexType>
+                                                                </xs:element>
+                                                                <xs:element maxOccurs="unbounded" name="ECUC-TEXTUAL-PARAM-VALUE">
+                                                                  <xs:complexType>
+                                                                    <xs:sequence>
+                                                                      <xs:element name="DEFINITION-REF">
+                                                                        <xs:complexType>
+                                                                          <xs:simpleContent>
+                                                                            <xs:extension base="xs:string">
+                                                                              <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                            </xs:extension>
+                                                                          </xs:simpleContent>
+                                                                        </xs:complexType>
+                                                                      </xs:element>
+                                                                      <xs:element name="VALUE" type="xs:string" />
+                                                                    </xs:sequence>
+                                                                  </xs:complexType>
+                                                                </xs:element>
+                                                              </xs:choice>
+                                                            </xs:sequence>
+                                                          </xs:complexType>
+                                                        </xs:element>
+                                                        <xs:element minOccurs="0" name="REFERENCE-VALUES">
+                                                          <xs:complexType>
+                                                            <xs:sequence>
+                                                              <xs:element maxOccurs="unbounded" name="ECUC-REFERENCE-VALUE">
+                                                                <xs:complexType>
+                                                                  <xs:sequence>
+                                                                    <xs:element name="DEFINITION-REF">
+                                                                      <xs:complexType>
+                                                                        <xs:simpleContent>
+                                                                          <xs:extension base="xs:string">
+                                                                            <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                          </xs:extension>
+                                                                        </xs:simpleContent>
+                                                                      </xs:complexType>
+                                                                    </xs:element>
+                                                                    <xs:element minOccurs="0" name="VALUE-REF">
+                                                                      <xs:complexType>
+                                                                        <xs:simpleContent>
+                                                                          <xs:extension base="xs:string">
+                                                                            <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                          </xs:extension>
+                                                                        </xs:simpleContent>
+                                                                      </xs:complexType>
+                                                                    </xs:element>
+                                                                  </xs:sequence>
+                                                                </xs:complexType>
+                                                              </xs:element>
+                                                            </xs:sequence>
+                                                          </xs:complexType>
+                                                        </xs:element>
+                                                        <xs:element minOccurs="0" name="SUB-CONTAINERS">
+                                                          <xs:complexType>
+                                                            <xs:sequence>
+                                                              <xs:element maxOccurs="unbounded" name="ECUC-CONTAINER-VALUE">
+                                                                <xs:complexType>
+                                                                  <xs:sequence>
+                                                                    <xs:choice maxOccurs="unbounded">
+                                                                      <xs:element name="SHORT-NAME" type="xs:string" />
+                                                                      <xs:element name="DEFINITION-REF">
+                                                                        <xs:complexType>
+                                                                          <xs:simpleContent>
+                                                                            <xs:extension base="xs:string">
+                                                                              <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                            </xs:extension>
+                                                                          </xs:simpleContent>
+                                                                        </xs:complexType>
+                                                                      </xs:element>
+                                                                      <xs:element name="REFERENCE-VALUES">
+                                                                        <xs:complexType>
+                                                                          <xs:sequence>
+                                                                            <xs:element maxOccurs="unbounded" name="ECUC-REFERENCE-VALUE">
+                                                                              <xs:complexType>
+                                                                                <xs:sequence>
+                                                                                  <xs:element name="DEFINITION-REF">
+                                                                                    <xs:complexType>
+                                                                                      <xs:simpleContent>
+                                                                                        <xs:extension base="xs:string">
+                                                                                          <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                        </xs:extension>
+                                                                                      </xs:simpleContent>
+                                                                                    </xs:complexType>
+                                                                                  </xs:element>
+                                                                                  <xs:element name="VALUE-REF">
+                                                                                    <xs:complexType>
+                                                                                      <xs:simpleContent>
+                                                                                        <xs:extension base="xs:string">
+                                                                                          <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                        </xs:extension>
+                                                                                      </xs:simpleContent>
+                                                                                    </xs:complexType>
+                                                                                  </xs:element>
+                                                                                </xs:sequence>
+                                                                              </xs:complexType>
+                                                                            </xs:element>
+                                                                          </xs:sequence>
+                                                                        </xs:complexType>
+                                                                      </xs:element>
+                                                                      <xs:element name="PARAMETER-VALUES">
+                                                                        <xs:complexType>
+                                                                          <xs:sequence>
+                                                                            <xs:choice maxOccurs="unbounded">
+                                                                              <xs:element name="ECUC-TEXTUAL-PARAM-VALUE">
+                                                                                <xs:complexType>
+                                                                                  <xs:sequence>
+                                                                                    <xs:element name="DEFINITION-REF">
+                                                                                      <xs:complexType>
+                                                                                        <xs:simpleContent>
+                                                                                          <xs:extension base="xs:string">
+                                                                                            <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                          </xs:extension>
+                                                                                        </xs:simpleContent>
+                                                                                      </xs:complexType>
+                                                                                    </xs:element>
+                                                                                    <xs:element name="VALUE" type="xs:string" />
+                                                                                  </xs:sequence>
+                                                                                </xs:complexType>
+                                                                              </xs:element>
+                                                                              <xs:element name="ECUC-NUMERICAL-PARAM-VALUE">
+                                                                                <xs:complexType>
+                                                                                  <xs:sequence>
+                                                                                    <xs:element name="DEFINITION-REF">
+                                                                                      <xs:complexType>
+                                                                                        <xs:simpleContent>
+                                                                                          <xs:extension base="xs:string">
+                                                                                            <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                          </xs:extension>
+                                                                                        </xs:simpleContent>
+                                                                                      </xs:complexType>
+                                                                                    </xs:element>
+                                                                                    <xs:element name="VALUE" type="xs:double" />
+                                                                                  </xs:sequence>
+                                                                                </xs:complexType>
+                                                                              </xs:element>
+                                                                            </xs:choice>
+                                                                          </xs:sequence>
+                                                                        </xs:complexType>
+                                                                      </xs:element>
+                                                                      <xs:element name="SUB-CONTAINERS">
+                                                                        <xs:complexType>
+                                                                          <xs:sequence>
+                                                                            <xs:element maxOccurs="unbounded" name="ECUC-CONTAINER-VALUE">
+                                                                              <xs:complexType>
+                                                                                <xs:sequence>
+                                                                                  <xs:element name="SHORT-NAME" type="xs:string" />
+                                                                                  <xs:element name="DEFINITION-REF">
+                                                                                    <xs:complexType>
+                                                                                      <xs:simpleContent>
+                                                                                        <xs:extension base="xs:string">
+                                                                                          <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                        </xs:extension>
+                                                                                      </xs:simpleContent>
+                                                                                    </xs:complexType>
+                                                                                  </xs:element>
+                                                                                  <xs:element minOccurs="0" name="PARAMETER-VALUES">
+                                                                                    <xs:complexType>
+                                                                                      <xs:sequence>
+                                                                                        <xs:choice maxOccurs="unbounded">
+                                                                                          <xs:element maxOccurs="unbounded" name="ECUC-TEXTUAL-PARAM-VALUE">
+                                                                                            <xs:complexType>
+                                                                                              <xs:sequence>
+                                                                                                <xs:element name="DEFINITION-REF">
+                                                                                                  <xs:complexType>
+                                                                                                    <xs:simpleContent>
+                                                                                                      <xs:extension base="xs:string">
+                                                                                                        <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                      </xs:extension>
+                                                                                                    </xs:simpleContent>
+                                                                                                  </xs:complexType>
+                                                                                                </xs:element>
+                                                                                                <xs:element name="VALUE" type="xs:string" />
+                                                                                              </xs:sequence>
+                                                                                            </xs:complexType>
+                                                                                          </xs:element>
+                                                                                          <xs:element maxOccurs="unbounded" name="ECUC-NUMERICAL-PARAM-VALUE">
+                                                                                            <xs:complexType>
+                                                                                              <xs:sequence>
+                                                                                                <xs:element name="DEFINITION-REF">
+                                                                                                  <xs:complexType>
+                                                                                                    <xs:simpleContent>
+                                                                                                      <xs:extension base="xs:string">
+                                                                                                        <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                      </xs:extension>
+                                                                                                    </xs:simpleContent>
+                                                                                                  </xs:complexType>
+                                                                                                </xs:element>
+                                                                                                <xs:element name="VALUE" type="xs:float" />
+                                                                                              </xs:sequence>
+                                                                                            </xs:complexType>
+                                                                                          </xs:element>
+                                                                                        </xs:choice>
+                                                                                      </xs:sequence>
+                                                                                    </xs:complexType>
+                                                                                  </xs:element>
+                                                                                  <xs:element minOccurs="0" name="SUB-CONTAINERS">
+                                                                                    <xs:complexType>
+                                                                                      <xs:sequence>
+                                                                                        <xs:element maxOccurs="unbounded" name="ECUC-CONTAINER-VALUE">
+                                                                                          <xs:complexType>
+                                                                                            <xs:sequence>
+                                                                                              <xs:element name="SHORT-NAME" type="xs:string" />
+                                                                                              <xs:element name="DEFINITION-REF">
+                                                                                                <xs:complexType>
+                                                                                                  <xs:simpleContent>
+                                                                                                    <xs:extension base="xs:string">
+                                                                                                      <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                    </xs:extension>
+                                                                                                  </xs:simpleContent>
+                                                                                                </xs:complexType>
+                                                                                              </xs:element>
+                                                                                              <xs:element name="PARAMETER-VALUES">
+                                                                                                <xs:complexType>
+                                                                                                  <xs:sequence>
+                                                                                                    <xs:choice maxOccurs="unbounded">
+                                                                                                      <xs:element name="ECUC-TEXTUAL-PARAM-VALUE">
+                                                                                                        <xs:complexType>
+                                                                                                          <xs:sequence>
+                                                                                                            <xs:element name="DEFINITION-REF">
+                                                                                                              <xs:complexType>
+                                                                                                                <xs:simpleContent>
+                                                                                                                  <xs:extension base="xs:string">
+                                                                                                                    <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                  </xs:extension>
+                                                                                                                </xs:simpleContent>
+                                                                                                              </xs:complexType>
+                                                                                                            </xs:element>
+                                                                                                            <xs:element name="VALUE" type="xs:string" />
+                                                                                                          </xs:sequence>
+                                                                                                        </xs:complexType>
+                                                                                                      </xs:element>
+                                                                                                      <xs:element maxOccurs="unbounded" name="ECUC-NUMERICAL-PARAM-VALUE">
+                                                                                                        <xs:complexType>
+                                                                                                          <xs:sequence>
+                                                                                                            <xs:element name="DEFINITION-REF">
+                                                                                                              <xs:complexType>
+                                                                                                                <xs:simpleContent>
+                                                                                                                  <xs:extension base="xs:string">
+                                                                                                                    <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                  </xs:extension>
+                                                                                                                </xs:simpleContent>
+                                                                                                              </xs:complexType>
+                                                                                                            </xs:element>
+                                                                                                            <xs:element name="VALUE" type="xs:double" />
+                                                                                                          </xs:sequence>
+                                                                                                        </xs:complexType>
+                                                                                                      </xs:element>
+                                                                                                    </xs:choice>
+                                                                                                  </xs:sequence>
+                                                                                                </xs:complexType>
+                                                                                              </xs:element>
+                                                                                              <xs:element minOccurs="0" name="SUB-CONTAINERS">
+                                                                                                <xs:complexType>
+                                                                                                  <xs:sequence>
+                                                                                                    <xs:element maxOccurs="unbounded" name="ECUC-CONTAINER-VALUE">
+                                                                                                      <xs:complexType>
+                                                                                                        <xs:sequence>
+                                                                                                          <xs:element name="SHORT-NAME" type="xs:string" />
+                                                                                                          <xs:element name="DEFINITION-REF">
+                                                                                                            <xs:complexType>
+                                                                                                              <xs:simpleContent>
+                                                                                                                <xs:extension base="xs:string">
+                                                                                                                  <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                </xs:extension>
+                                                                                                              </xs:simpleContent>
+                                                                                                            </xs:complexType>
+                                                                                                          </xs:element>
+                                                                                                          <xs:element name="PARAMETER-VALUES">
+                                                                                                            <xs:complexType>
+                                                                                                              <xs:sequence>
+                                                                                                                <xs:choice maxOccurs="unbounded">
+                                                                                                                  <xs:element name="ECUC-TEXTUAL-PARAM-VALUE">
+                                                                                                                    <xs:complexType>
+                                                                                                                      <xs:sequence>
+                                                                                                                        <xs:element name="DEFINITION-REF">
+                                                                                                                          <xs:complexType>
+                                                                                                                            <xs:simpleContent>
+                                                                                                                              <xs:extension base="xs:string">
+                                                                                                                                <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                              </xs:extension>
+                                                                                                                            </xs:simpleContent>
+                                                                                                                          </xs:complexType>
+                                                                                                                        </xs:element>
+                                                                                                                        <xs:element name="VALUE" type="xs:string" />
+                                                                                                                      </xs:sequence>
+                                                                                                                    </xs:complexType>
+                                                                                                                  </xs:element>
+                                                                                                                  <xs:element maxOccurs="unbounded" name="ECUC-NUMERICAL-PARAM-VALUE">
+                                                                                                                    <xs:complexType>
+                                                                                                                      <xs:sequence>
+                                                                                                                        <xs:element name="DEFINITION-REF">
+                                                                                                                          <xs:complexType>
+                                                                                                                            <xs:simpleContent>
+                                                                                                                              <xs:extension base="xs:string">
+                                                                                                                                <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                              </xs:extension>
+                                                                                                                            </xs:simpleContent>
+                                                                                                                          </xs:complexType>
+                                                                                                                        </xs:element>
+                                                                                                                        <xs:element name="VALUE" type="xs:double" />
+                                                                                                                      </xs:sequence>
+                                                                                                                    </xs:complexType>
+                                                                                                                  </xs:element>
+                                                                                                                </xs:choice>
+                                                                                                              </xs:sequence>
+                                                                                                            </xs:complexType>
+                                                                                                          </xs:element>
+                                                                                                          <xs:element minOccurs="0" name="SUB-CONTAINERS">
+                                                                                                            <xs:complexType>
+                                                                                                              <xs:sequence>
+                                                                                                                <xs:element maxOccurs="unbounded" name="ECUC-CONTAINER-VALUE">
+                                                                                                                  <xs:complexType>
+                                                                                                                    <xs:sequence>
+                                                                                                                      <xs:element name="SHORT-NAME" type="xs:string" />
+                                                                                                                      <xs:element name="DEFINITION-REF">
+                                                                                                                        <xs:complexType>
+                                                                                                                          <xs:simpleContent>
+                                                                                                                            <xs:extension base="xs:string">
+                                                                                                                              <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                            </xs:extension>
+                                                                                                                          </xs:simpleContent>
+                                                                                                                        </xs:complexType>
+                                                                                                                      </xs:element>
+                                                                                                                      <xs:element name="PARAMETER-VALUES">
+                                                                                                                        <xs:complexType>
+                                                                                                                          <xs:sequence>
+                                                                                                                            <xs:element minOccurs="0" name="ECUC-TEXTUAL-PARAM-VALUE">
+                                                                                                                              <xs:complexType>
+                                                                                                                                <xs:sequence>
+                                                                                                                                  <xs:element name="DEFINITION-REF">
+                                                                                                                                    <xs:complexType>
+                                                                                                                                      <xs:simpleContent>
+                                                                                                                                        <xs:extension base="xs:string">
+                                                                                                                                          <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                                        </xs:extension>
+                                                                                                                                      </xs:simpleContent>
+                                                                                                                                    </xs:complexType>
+                                                                                                                                  </xs:element>
+                                                                                                                                  <xs:element name="VALUE" type="xs:string" />
+                                                                                                                                </xs:sequence>
+                                                                                                                              </xs:complexType>
+                                                                                                                            </xs:element>
+                                                                                                                            <xs:element maxOccurs="unbounded" name="ECUC-NUMERICAL-PARAM-VALUE">
+                                                                                                                              <xs:complexType>
+                                                                                                                                <xs:sequence>
+                                                                                                                                  <xs:element name="DEFINITION-REF">
+                                                                                                                                    <xs:complexType>
+                                                                                                                                      <xs:simpleContent>
+                                                                                                                                        <xs:extension base="xs:string">
+                                                                                                                                          <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                                        </xs:extension>
+                                                                                                                                      </xs:simpleContent>
+                                                                                                                                    </xs:complexType>
+                                                                                                                                  </xs:element>
+                                                                                                                                  <xs:element name="VALUE" type="xs:double" />
+                                                                                                                                </xs:sequence>
+                                                                                                                              </xs:complexType>
+                                                                                                                            </xs:element>
+                                                                                                                          </xs:sequence>
+                                                                                                                        </xs:complexType>
+                                                                                                                      </xs:element>
+                                                                                                                      <xs:element minOccurs="0" name="SUB-CONTAINERS">
+                                                                                                                        <xs:complexType>
+                                                                                                                          <xs:sequence>
+                                                                                                                            <xs:element name="ECUC-CONTAINER-VALUE">
+                                                                                                                              <xs:complexType>
+                                                                                                                                <xs:sequence>
+                                                                                                                                  <xs:element name="SHORT-NAME" type="xs:string" />
+                                                                                                                                  <xs:element name="DEFINITION-REF">
+                                                                                                                                    <xs:complexType>
+                                                                                                                                      <xs:simpleContent>
+                                                                                                                                        <xs:extension base="xs:string">
+                                                                                                                                          <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                                        </xs:extension>
+                                                                                                                                      </xs:simpleContent>
+                                                                                                                                    </xs:complexType>
+                                                                                                                                  </xs:element>
+                                                                                                                                  <xs:element name="PARAMETER-VALUES">
+                                                                                                                                    <xs:complexType>
+                                                                                                                                      <xs:sequence>
+                                                                                                                                        <xs:element maxOccurs="unbounded" name="ECUC-NUMERICAL-PARAM-VALUE">
+                                                                                                                                          <xs:complexType>
+                                                                                                                                            <xs:sequence>
+                                                                                                                                              <xs:element name="DEFINITION-REF">
+                                                                                                                                                <xs:complexType>
+                                                                                                                                                  <xs:simpleContent>
+                                                                                                                                                    <xs:extension base="xs:string">
+                                                                                                                                                      <xs:attribute name="DEST" type="xs:string" use="required" />
+                                                                                                                                                    </xs:extension>
+                                                                                                                                                  </xs:simpleContent>
+                                                                                                                                                </xs:complexType>
+                                                                                                                                              </xs:element>
+                                                                                                                                              <xs:element name="VALUE" type="xs:double" />
+                                                                                                                                            </xs:sequence>
+                                                                                                                                          </xs:complexType>
+                                                                                                                                        </xs:element>
+                                                                                                                                      </xs:sequence>
+                                                                                                                                    </xs:complexType>
+                                                                                                                                  </xs:element>
+                                                                                                                                </xs:sequence>
+                                                                                                                                <xs:attribute name="UUID" type="xs:string" use="required" />
+                                                                                                                              </xs:complexType>
+                                                                                                                            </xs:element>
+                                                                                                                          </xs:sequence>
+                                                                                                                        </xs:complexType>
+                                                                                                                      </xs:element>
+                                                                                                                    </xs:sequence>
+                                                                                                                    <xs:attribute name="UUID" type="xs:string" use="required" />
+                                                                                                                  </xs:complexType>
+                                                                                                                </xs:element>
+                                                                                                              </xs:sequence>
+                                                                                                            </xs:complexType>
+                                                                                                          </xs:element>
+                                                                                                        </xs:sequence>
+                                                                                                        <xs:attribute name="UUID" type="xs:string" use="required" />
+                                                                                                      </xs:complexType>
+                                                                                                    </xs:element>
+                                                                                                  </xs:sequence>
+                                                                                                </xs:complexType>
+                                                                                              </xs:element>
+                                                                                            </xs:sequence>
+                                                                                            <xs:attribute name="UUID" type="xs:string" use="optional" />
+                                                                                          </xs:complexType>
+                                                                                        </xs:element>
+                                                                                      </xs:sequence>
+                                                                                    </xs:complexType>
+                                                                                  </xs:element>
+                                                                                </xs:sequence>
+                                                                                <xs:attribute name="UUID" type="xs:string" use="optional" />
+                                                                              </xs:complexType>
+                                                                            </xs:element>
+                                                                          </xs:sequence>
+                                                                        </xs:complexType>
+                                                                      </xs:element>
+                                                                    </xs:choice>
+                                                                  </xs:sequence>
+                                                                  <xs:attribute name="UUID" type="xs:string" use="optional" />
+                                                                </xs:complexType>
+                                                              </xs:element>
+                                                            </xs:sequence>
+                                                          </xs:complexType>
+                                                        </xs:element>
+                                                      </xs:sequence>
+                                                      <xs:attribute name="UUID" type="xs:string" use="optional" />
+                                                    </xs:complexType>
+                                                  </xs:element>
+                                                </xs:sequence>
+                                              </xs:complexType>
+                                            </xs:element>
+                                          </xs:sequence>
+                                          <xs:attribute name="UUID" type="xs:string" use="optional" />
+                                        </xs:complexType>
+                                      </xs:element>
+                                    </xs:sequence>
+                                  </xs:complexType>
+                                </xs:element>
+                              </xs:sequence>
+                              <xs:attribute name="UUID" type="xs:string" use="optional" />
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

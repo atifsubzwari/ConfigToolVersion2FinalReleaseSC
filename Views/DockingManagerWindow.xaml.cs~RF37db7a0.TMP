@@ -1,0 +1,3834 @@
+﻿using ConfigGenerator.Helper;
+using ConfigGenerator.Helpers;
+using ConfigGenerator.Models;
+using Microsoft.Win32;
+using Syncfusion.SfSkinManager;
+using Syncfusion.Windows.Tools;
+using Syncfusion.Windows.Tools.Controls;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Web.Script.Serialization;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Forms.Integration;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using Logger = ConfigGenerator.Logging;
+using WinForms = System.Windows.Forms;
+
+namespace ConfigGenerator
+{
+    /// <summary>
+    /// Interaction logic for Docking.xaml
+    /// </summary>
+    public partial class DockingManagerWindow : Window
+    {
+
+        #region Class Fields
+
+        /// <summary>
+        /// Class Fields
+        /// </summary>
+
+        private string m_strStoragePath = string.Format(@"{0}\ConfigGenerator.", Environment.CurrentDirectory);
+        #endregion
+        #region Fields
+        private static string currentVisualStyle;
+        private List<string> allNodes = new List<string>();
+        private Dictionary<String, List<String>> txMessage = new Dictionary<string, List<string>>();
+        private Dictionary<String, List<String>> rxMessage = new Dictionary<string, List<string>>();
+        private Dictionary<String, String> rxReceptionTimeout = new Dictionary<string, string>();
+        private Dictionary<String, String> rxmReceptionTimeout = null;
+        private Dictionary<String, List<String>> txMessageWithFrameId = new Dictionary<string, List<string>>();
+        private Dictionary<String, List<String>> rxMessageWithFrameId = new Dictionary<string, List<string>>();
+        private Dictionary<String, String> messagesTxFrameIds = new Dictionary<string, string>();
+        private Dictionary<String, String> messagesRxFrameIds = new Dictionary<string, string>();
+        private Dictionary<String, String> messagesTxDLC = new Dictionary<string, string>();
+        private Dictionary<String, String> messagesRxDLC = new Dictionary<string, string>();
+        private Dictionary<String, String> messagesTxMethod = new Dictionary<string, string>();
+        private Dictionary<String, String> messagesTxCycleTime = new Dictionary<string, string>();
+        private Dictionary<String, String> messagesTxCounter = new Dictionary<string, string>();
+        private Dictionary<String, List<String>> messagesTxSignal = new Dictionary<string, List<String>>();
+        private Dictionary<String, String> messagesTxRange = new Dictionary<string, string>();
+        private Dictionary<String, String> messagesTxScale = new Dictionary<string, string>();
+        private Dictionary<String, String> messagesTxOffset = new Dictionary<string, string>();
+        private Dictionary<String, String> messagesRxMethod = new Dictionary<string, string>();
+        private Dictionary<String, String> rxReceptionTimeoutDefault = new Dictionary<string, string>();
+        private List<String> listCanIf = new List<string>();
+        private List<String> lstMailConfigParentsMailBox = new List<string>();
+        private Grid DynamicGridNew;
+        private int staRow = 0;
+        private Dictionary<String,String> mailBoxCanif=new Dictionary<string, string>();
+        private Dictionary<String, String> mailBoxMessage = new Dictionary<string, String>();
+        private Dictionary<String, String> mailBoxFrameId = new Dictionary<string, String>();
+        private Dictionary<String, String> mailBoxDLC = new Dictionary<string, String>();
+        private Dictionary<String, String> mailBoxMaskValue = new Dictionary<string, String>();
+        private Dictionary<String, List<String>> mailBoxMessageMore = new Dictionary<string, List<string>>();
+        private Dictionary<String, List<String>> mailBoxFrameIdMore = new Dictionary<string, List<String>>();
+        private Dictionary<String, List<String>> mailBoxDLCMore = new Dictionary<string, List<String>>();
+        private Dictionary<String, List<String>> mailBoxMaskValueMore = new Dictionary<string, List<String>>();
+        private Button btnAddMore;
+
+
+
+
+        private string selectedNode = "";
+        private string selectedTxMessage = "";
+        private string selectedRxMessage = "";
+        private string selectedSignal = "";
+        private string selectedType = "";
+        private string fnamec = "";
+        private bool isManual = false;
+        private string selectedMailBox = "";
+        private string selectMailBoxMessage = "";
+        private string selectMailBoxFrameId = "";
+        private string selectMailBoxDLC = "";
+        private string selectMailBoxMaskValue = "";
+        private string selectedMailCanIf = "";
+        private bool isChanged = true;
+
+        #endregion
+
+        #region Properties
+        /// <summary>
+        /// Gets or sets the current visual style.
+        /// </summary>
+        /// <value></value>
+        /// <remarks></remarks>
+        public string CurrentVisualStyle
+        {
+            get
+            {
+                return currentVisualStyle;
+            }
+            set
+            {
+                currentVisualStyle = value;
+                OnVisualStyleChanged();
+            }
+        }
+        #endregion
+
+        #region Constructor
+        /// <summary>
+        /// Constructor for DockingManager.
+        /// </summary>
+        public DockingManagerWindow()
+        {
+
+            InitializeComponent();
+            DockingManager.ActiveWindow = Can;
+            InitWindowsFormsHost();
+            SubscribeForEvents();
+            this.Loaded += OnLoaded;
+            listCanIf.Add("CANIF_RxBasicCANMailbox");
+            listCanIf.Add("CANIF_RxFullCANMailbox");
+            listCanIf.Add("CANIF_TxBasicCANMailbox");
+            listCanIf.Add("CANIF_TxFullCANMailbox");
+            listCanIf.Add("CANIF_UnusedCANMailbox");
+
+            Logger.Log.Instance.Debug("Validating NLog");
+            Logger.Log.Instance.Info("Info Validating NLog");
+
+            try
+            {
+
+                DockingManagerModelHelper.Configuration = DockingManagerModelHelper.LoadARXML(false);
+                DockingManagerModelHelper.ProjectName = DockingManagerModelHelper.Configuration.ARPACKAGES[0].ELEMENTS.ECUCMODULECONFIGURATIONVALUES.DEFINITIONREF.Value;
+                DockingManagerModelHelper.ModuleName = DockingManagerModelHelper.Configuration.ARPACKAGES[0].SHORTNAME;
+
+                PopulateWorkspaceExplorer();
+                if (File.Exists(DockingManagerModelHelper.TargetInputFolderPath + "\\Sample_DB.dbc"))
+                {
+                    CreateDynamicWPFGridForModuleStaticCan("Sample_DB.dbc");
+                }
+                CreateDynamicWPFGridForModule();
+
+
+
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Instance.Error("Exception encountered with message: " + ex.Message);
+                throw ex;
+            }
+        }
+        #endregion
+
+        #region "Dynamic Loading of Controls"
+        private void PopulateWorkspaceExplorer()
+        {
+            String WorkspaceName = DockingManagerModelHelper.Configuration.ARPACKAGES[0].ELEMENTS.ECUCMODULECONFIGURATIONVALUES.DEFINITIONREF.Value.ToString().Trim('/').Split('/')[0];
+
+            if (String.IsNullOrEmpty(WorkspaceName))
+            {
+                // We dont even the have the root node. Some thing wrong with the ARXML
+                Logger.Log.Instance.Error("ARXML does not have even a single ARPACKAGE");
+                MessageBox.Show("ARXML does not have even a single ARPACKAGE. Check the input ARXML");
+                return;
+            }
+
+            // Let create the Tree which is just a holder for all the items and sub items
+            TreeViewAdv wsTreeView = new TreeViewAdv();
+            wsTreeView.SortingField = "Header";
+            wsTreeView.Sorting = SortDirection.Ascending;
+            wsTreeView.IsVirtualizing = true;
+            wsTreeView.VirtualizationMode = Syncfusion.Windows.Tools.VirtualizationMode.Normal;
+            wsTreeView.AnimationType = AnimationType.Fade;
+
+            wsTreeView.SelectedItemChanged += wsTreeView_SelectedItemChanged;
+
+            // Lets set the Workspace name
+            TreeViewItemAdv tviWorkspace = new TreeViewItemAdv() { Header = WorkspaceName.ToString() };
+            tviWorkspace.ExpandedImageSource = new BitmapImage(new Uri("/../Images/Folder_Expanded.png", UriKind.Relative));
+            tviWorkspace.CollapsedImageSource = new BitmapImage(new Uri("/../Images/Folder_Collapsed.png", UriKind.Relative));
+            tviWorkspace.IsExpanded = true;
+
+            foreach (var ArPkg in DockingManagerModelHelper.Configuration.ARPACKAGES)
+            {
+                string modulename = ArPkg.SHORTNAME.ToString();
+                TreeViewItemAdv tviModule = new TreeViewItemAdv() { Header = modulename };
+                tviModule.Name = modulename;
+                tviModule.LeftImageSource = new BitmapImage(new Uri("/../Images/" + modulename + "_MainModule_18px.png", UriKind.Relative));
+
+                tviWorkspace.Items.Add(tviModule);
+                Logger.Log.Instance.Info(String.Format("Added {0} module to the workspace view", modulename));
+            }
+
+            wsTreeView.Items.Add(tviWorkspace);
+
+            WorkspacesExplorer.Content = wsTreeView;
+        }
+
+        private void CreateDynamicWPFGridForModule()
+        {
+            string modulename = DockingManagerModelHelper.ModuleName;
+
+            var currentPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => String.Equals(x.SHORTNAME.ToString().ToLower(), modulename.ToLower())).FirstOrDefault();
+            bool isParentAdded = false;
+
+            if (modulename == DockingManagerModelHelper.ProjectName)
+            {
+                // User just clicked on the Project name. Ignore it
+                return;
+            }
+
+            if (currentPackage == null)
+            {
+                MessageBox.Show(modulename + " DOES NOT exist  in the input ARXML file", "Error - Module not found");
+                return;
+            }
+
+            // Clear any existing contents. This will help when we change modules
+            SpForDynamicGrid.Children.Clear();
+
+            // Create the Grid
+            Grid DynamicGrid = new Grid();
+            DynamicGrid.Width = 930;
+            DynamicGrid.HorizontalAlignment = HorizontalAlignment.Left;
+            DynamicGrid.VerticalAlignment = VerticalAlignment.Top;
+            DynamicGrid.ShowGridLines = false;
+            DynamicGrid.Name = modulename;
+
+            // Create Columns
+            ColumnDefinition gridCol1 = new ColumnDefinition();
+            ColumnDefinition gridCol2 = new ColumnDefinition();
+            ColumnDefinition gridCol3 = new ColumnDefinition();
+            DynamicGrid.ColumnDefinitions.Add(gridCol1);
+            DynamicGrid.ColumnDefinitions.Add(gridCol2);
+            DynamicGrid.ColumnDefinitions.Add(gridCol3);
+
+            int startrow = 0;
+            int col = 0;
+            List<string> lstMailConfigParents = new List<string>();
+
+
+            for (int j = 0; j < currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Length; j++)
+            {
+                var currentConfigParamGrandParent = currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[j];
+                //TODO: Need to refine below code to accept only filtered object.
+                for (int k = 0; k < currentConfigParamGrandParent.SUBCONTAINERS.Length; k++)
+                {
+                    List<string> lstSupportedValues = new List<string>();
+                    string strControlType = string.Empty;
+                    var currentConfigParamParent = currentConfigParamGrandParent.SUBCONTAINERS[k];
+
+                    var areChildControlsEnabled = (currentConfigParamParent.PARAMETERVALUES == null) ? true : (currentConfigParamParent.PARAMETERVALUES.VALUE.Value.ToLower().Equals("enable") ? true : false);
+                    var ChildControlsEnabledName = currentConfigParamParent.PARAMETERVALUES != null ? currentConfigParamParent.PARAMETERVALUES.DEFINITIONREF.name : "";
+                    var ChildControlsEnabledText = currentConfigParamParent.PARAMETERVALUES != null ? currentConfigParamParent.PARAMETERVALUES.DEFINITIONREF.Value : "";
+                    bool isEnableDisableCheckBoxAdded = false;
+
+                    // foreach (var currentConfigParamChild in currentConfigParamParent.SUBCONTAINERS)
+                    for (int i = 0; i < currentConfigParamParent.SUBCONTAINERS.Length; i++)
+                    {
+                        var currentConfigParamChild = currentConfigParamParent.SUBCONTAINERS[i];
+                        var currentConfigParamName = currentConfigParamChild.PARAMETERVALUES.DEFINITIONREF.Value;
+                        var currentConfigParamValue = currentConfigParamChild.PARAMETERVALUES.VALUE.Value;
+                        var currentConfigParamID = currentConfigParamChild.PARAMETERVALUES.DEFINITIONREF.name;
+
+                        // Everytime let's starts a new row from column index 0 
+                        col = 0;
+
+                        if (!isParentAdded && currentConfigParamGrandParent.SUBCONTAINERS.Length > 1)
+                        {
+                            // Populate mailbox list
+                            lstMailConfigParents = currentConfigParamGrandParent.SUBCONTAINERS.Select(x => x.SHORTNAME).ToList();
+
+                            var currSelectedMailBox = SpForDynamicGrid.Children
+                                                        .OfType<ComboBox>()
+                                                        .Where(cb => cb.Name == currentConfigParamGrandParent.SHORTNAME + "_Val")
+                                                        .FirstOrDefault();
+
+                            RowDefinition gridRowMailbox = new RowDefinition();
+                            gridRowMailbox.Height = new GridLength(45);
+                            DynamicGrid.RowDefinitions.Add(gridRowMailbox);
+
+                            TextBlock lblMailBox = new TextBlock();
+                            lblMailBox.Text = currentConfigParamGrandParent.SHORTNAME;
+                            lblMailBox.Name = currentConfigParamGrandParent.SHORTNAME + "_LbL";
+                            lblMailBox.FontFamily = new FontFamily("Calibri");
+                            lblMailBox.FontSize = 14;
+                            lblMailBox.VerticalAlignment = VerticalAlignment.Center;
+                            lblMailBox.TextWrapping = TextWrapping.Wrap;
+                            lblMailBox.ToolTip = currentConfigParamGrandParent.BRIEF.Trim();
+                            Grid.SetRow(lblMailBox, startrow + i);
+                            Grid.SetColumn(lblMailBox, col);
+                            col++;
+                            DynamicGrid.Children.Add(lblMailBox);
+
+                            ComboBox drpDwnMailBox = new ComboBox();
+                            drpDwnMailBox.Name = currentConfigParamGrandParent.SHORTNAME + "_Val";
+                            drpDwnMailBox.FontSize = 12;
+                            drpDwnMailBox.FontWeight = FontWeights.Bold;
+                            drpDwnMailBox.Height = 30;
+                            drpDwnMailBox.Background = Brushes.White;
+                            drpDwnMailBox.IsSynchronizedWithCurrentItem = true;
+                            drpDwnMailBox.SelectedIndex = currSelectedMailBox == null ? 0 : currSelectedMailBox.SelectedIndex;
+                            drpDwnMailBox.SelectionChanged += drpDwnMailBox_SelectionChanged;
+                            Grid.SetRow(drpDwnMailBox, startrow + i);
+                            Grid.SetColumn(drpDwnMailBox, col);
+                            col++;
+                            drpDwnMailBox.ItemsSource = lstMailConfigParents;
+                            if (lstMailConfigParents != null && lstMailConfigParents.Count > 0)
+                            {
+                                selectedMailBox = lstMailConfigParents[0];
+                            }
+
+                            DynamicGrid.Children.Add(drpDwnMailBox);
+
+                            isParentAdded = true;
+                        }
+
+
+                        if (!isEnableDisableCheckBoxAdded)
+                        {
+                            RowDefinition gridRowCheckBox = new RowDefinition();
+                            gridRowCheckBox.Height = new GridLength(45);
+                            DynamicGrid.RowDefinitions.Add(gridRowCheckBox);
+                            col = 0;
+                            TextBlock lblChekBoxText = new TextBlock();
+                            lblChekBoxText.Text = ChildControlsEnabledName;
+                            lblChekBoxText.Name = ChildControlsEnabledName + "_Val";
+                            lblChekBoxText.FontFamily = new FontFamily("Calibri");
+                            lblChekBoxText.FontSize = 14;
+                            lblChekBoxText.VerticalAlignment = VerticalAlignment.Center;
+                            lblChekBoxText.TextWrapping = TextWrapping.Wrap;
+                            lblChekBoxText.ToolTip = currentConfigParamGrandParent.BRIEF.Trim();
+
+                            Grid.SetRow(lblChekBoxText, startrow + i + 1);
+                            Grid.SetColumn(lblChekBoxText, col);
+                            col++;
+                            DynamicGrid.Children.Add(lblChekBoxText);
+
+                            // Add the Checkbox to enable of disable this MailboxCtrl
+                            CheckBox chkBoxEnableDisable = new CheckBox();
+                            chkBoxEnableDisable.IsChecked = (currentConfigParamParent.PARAMETERVALUES == null) ? true : (currentConfigParamParent.PARAMETERVALUES.VALUE.Value.ToLower().Equals("enable") ? true : false);
+                            chkBoxEnableDisable.FontSize = 12;
+                            chkBoxEnableDisable.FontWeight = FontWeights.Bold;
+                            chkBoxEnableDisable.Height = 15;
+                            chkBoxEnableDisable.Margin = new Thickness(5, 0, 0, 0);
+                            chkBoxEnableDisable.Name = currentConfigParamGrandParent.SHORTNAME + "_Val";
+                            chkBoxEnableDisable.Background = Brushes.White;
+                            chkBoxEnableDisable.Click += MailboxCtrl_Clicked;
+                            Grid.SetRow(chkBoxEnableDisable, startrow + i + 1);
+                            Grid.SetColumn(chkBoxEnableDisable, col);
+
+                            Grid.SetColumn(chkBoxEnableDisable, col);
+                            col++;
+
+                            DynamicGrid.Children.Add(chkBoxEnableDisable);
+                            isEnableDisableCheckBoxAdded = true;
+
+                        }
+
+                        RowDefinition gridRow = new RowDefinition();
+                        gridRow.Height = new GridLength(45);
+                        DynamicGrid.RowDefinitions.Add(gridRow);
+
+                        TextBlock lbl = new TextBlock();
+
+                        // Everytime let's starts a new row from column index 0 
+                        col = 0;
+
+                        if (currentConfigParamChild.PARAMETERVALUES.SUPPORTEDVALUES.SUPPORTEDVALUE == null || currentConfigParamChild.PARAMETERVALUES.SUPPORTEDVALUES.SUPPORTEDVALUE.Length == 1)
+                        {
+                            strControlType = "Textbox";
+                        }
+                        else if (currentConfigParamChild.PARAMETERVALUES.SUPPORTEDVALUES.SUPPORTEDVALUE.Length > 1)
+                        {
+                            lstSupportedValues = currentConfigParamChild.PARAMETERVALUES.SUPPORTEDVALUES.SUPPORTEDVALUE.ToList();
+                            if (lstSupportedValues.Count > 0 && lstSupportedValues[0].Equals("Enable", StringComparison.OrdinalIgnoreCase))
+                            {
+                                strControlType = "Checkbox";
+                            }
+                            else
+                            {
+                                strControlType = "Combobox";
+                            }
+                        }
+
+                        lbl.Name = currentConfigParamID;
+                        lbl.Text = currentConfigParamName;
+                        lbl.FontFamily = new FontFamily("Calibri");
+                        lbl.FontSize = 14;
+                        lbl.VerticalAlignment = VerticalAlignment.Center;
+                        lbl.TextWrapping = TextWrapping.Wrap;
+                        lbl.ToolTip = currentConfigParamChild.BRIEF.Trim();
+                        if (isParentAdded)
+                        {
+                            Grid.SetRow(lbl, startrow + i + 2);
+                        }
+                        else
+                        {
+                            Grid.SetRow(lbl, startrow + i);
+                        }
+                        Grid.SetColumn(lbl, col);
+                        col++;
+                        DynamicGrid.Children.Add(lbl);
+
+                        switch (strControlType)
+                        {
+                            case "Combobox":
+                                ComboBox drpDwn = new ComboBox();
+                                drpDwn.FontSize = 12;
+                                drpDwn.FontWeight = FontWeights.Bold;
+                                drpDwn.Height = 30;
+                                drpDwn.Background = Brushes.White;
+                                drpDwn.IsEnabled = areChildControlsEnabled;
+                                drpDwn.Name = currentConfigParamID + "_Val";
+                                drpDwn.IsSynchronizedWithCurrentItem = true;
+                                if (isParentAdded)
+                                {
+                                    Grid.SetRow(drpDwn, startrow + i + 2);
+                                }
+                                else
+                                {
+                                    Grid.SetRow(drpDwn, startrow + i);
+                                }
+                                Grid.SetColumn(drpDwn, col);
+                                col++;
+                                drpDwn.ItemsSource = lstSupportedValues;
+                                drpDwn.SelectedValue = currentConfigParamValue;
+
+                                // Whenever CAN_DRIVER_MAILBOXx_INTERRUPT_CTRL(x=1…64)  checkbox is disabled,
+                                // the child [INTERRUPT_PRIORITY] configurations should be greyed out so that user cannot select any values
+                                if (currentConfigParamChild.PARAMETERVALUES.DEFINITIONREF.name.Contains("INTERRUPT_PRIORITY") &&
+                                    currentConfigParamParent.SUBCONTAINERS[i - 1].PARAMETERVALUES.DEFINITIONREF.name.Contains("INTERRUPT_CTRL") &&
+                                    currentConfigParamParent.SUBCONTAINERS[i - 1].PARAMETERVALUES.VALUE.Value.ToLower().Equals("disable"))
+                                {
+                                    drpDwn.IsEnabled = false;
+                                }
+
+                                DynamicGrid.Children.Add(drpDwn);
+                                break;
+                            case "Textbox":
+                                TextBox txtBox = new TextBox();
+                                txtBox.Text = currentConfigParamValue;
+                                txtBox.FontSize = 12;
+                                txtBox.FontWeight = FontWeights.Bold;
+                                txtBox.Height = 30;
+                                txtBox.Background = Brushes.White;
+                                txtBox.IsEnabled = areChildControlsEnabled;
+                                txtBox.Name = currentConfigParamID + "_Val";
+                                txtBox.LostFocus += TxtBox_LostFocus;
+                                if (isParentAdded)
+                                {
+                                    Grid.SetRow(txtBox, startrow + i + 2);
+                                }
+                                else
+                                {
+                                    Grid.SetRow(txtBox, startrow + i);
+                                }
+                                Grid.SetColumn(txtBox, col);
+                                col++;
+                                DynamicGrid.Children.Add(txtBox);
+                                break;
+                            case "Checkbox":
+                                CheckBox chkBox = new CheckBox();
+                                chkBox.IsChecked = currentConfigParamValue.ToString().Equals("ENABLE", StringComparison.OrdinalIgnoreCase) ? true : false;
+                                chkBox.FontSize = 12;
+                                chkBox.FontWeight = FontWeights.Bold;
+                                chkBox.Height = 15;
+                                chkBox.Background = Brushes.White;
+                                chkBox.IsEnabled = areChildControlsEnabled;
+                                chkBox.Name = currentConfigParamID + "_Val";
+                                if (currentConfigParamID.Contains("INTERRUPT_CTRL"))
+                                    chkBox.Click += ChkBox_Click;
+                                if (isParentAdded)
+                                {
+                                    Grid.SetRow(chkBox, startrow + i + 2);
+                                }
+                                else
+                                {
+                                    Grid.SetRow(chkBox, startrow + i);
+                                }
+
+                                Grid.SetColumn(chkBox, col);
+                                col++;
+                                DynamicGrid.Children.Add(chkBox);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+
+                    startrow += currentConfigParamParent.SUBCONTAINERS.Length;
+                    if (isParentAdded)
+                        break;
+
+                    // Add a splitter for each set of config values
+
+                    //Separator sep = new Separator();
+                    //sep.Background = Brushes.Red;
+                    //sep.Height = 5;
+                    //sep.Width = 150;
+                    //Grid.SetRow(sep, startrow);
+                    //DynamicGrid.Children.Add(sep);
+
+                    startrow++;
+                }
+            }
+            lstMailConfigParentsMailBox = lstMailConfigParents;
+            staRow = startrow;
+            DynamicGridNew = DynamicGrid;
+            DoCanIf();
+
+
+
+
+            // Display grid into a Window
+            SpForDynamicGrid.Children.Add(DynamicGrid);
+        }
+
+        private void DoCanIf()
+        {
+
+           
+            mailBoxMessage.Clear();
+            mailBoxFrameId.Clear();
+            mailBoxDLC.Clear();
+            mailBoxMaskValue.Clear();
+            mailBoxMessageMore.Clear();
+            mailBoxFrameIdMore.Clear();
+            mailBoxDLCMore.Clear();
+            mailBoxMaskValueMore.Clear();
+
+            Grid DynamicGrid = DynamicGridNew;
+            int startrow = staRow;
+            RowDefinition gridRowCanIfMailbox = new RowDefinition();
+            gridRowCanIfMailbox.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowCanIfMailbox);
+
+            TextBlock lblCanIfMailBox = new TextBlock();
+            lblCanIfMailBox.Text = "CAN IF Mail Box";
+            lblCanIfMailBox.Name = "CAN_IF_Mail_Box" + "_LbL";
+            lblCanIfMailBox.FontFamily = new FontFamily("Calibri");
+            lblCanIfMailBox.FontSize = 14;
+            lblCanIfMailBox.VerticalAlignment = VerticalAlignment.Center;
+            lblCanIfMailBox.TextWrapping = TextWrapping.Wrap;
+            lblCanIfMailBox.ToolTip = "CAN If Mail BOX";
+            Grid.SetRow(lblCanIfMailBox, startrow + 2);
+            Grid.SetColumn(lblCanIfMailBox, 0);
+
+            DynamicGrid.Children.Add(lblCanIfMailBox);
+
+            ComboBox drpDwnMailCanIfBox = new ComboBox();
+            drpDwnMailCanIfBox.Name = "MailCanIFMail" + "_Val";
+            drpDwnMailCanIfBox.FontSize = 12;
+            drpDwnMailCanIfBox.FontWeight = FontWeights.Bold;
+            drpDwnMailCanIfBox.Height = 30;
+            drpDwnMailCanIfBox.Background = Brushes.White;
+            drpDwnMailCanIfBox.IsSynchronizedWithCurrentItem = true;
+
+            drpDwnMailCanIfBox.ItemsSource = listCanIf;
+            if( selectedMailBox!=null && !selectedMailBox.Equals("") && mailBoxCanif.ContainsKey(selectedMailBox))
+            {
+                drpDwnMailCanIfBox.SelectedIndex = listCanIf.IndexOf(mailBoxCanif[selectedMailBox]);
+
+            }
+            else
+            {
+                drpDwnMailCanIfBox.SelectedIndex = 0;
+                selectedMailCanIf = (string)drpDwnMailCanIfBox.SelectedItem;
+
+
+            }
+            drpDwnMailCanIfBox.SelectionChanged += drpDwnMailCanIfBox_SelectionChanged;
+            Grid.SetRow(drpDwnMailCanIfBox, startrow + 2);
+            Grid.SetColumn(drpDwnMailCanIfBox, 1);
+
+            DynamicGrid.Children.Add(drpDwnMailCanIfBox);
+
+            Button btnAddMoreButton = new Button();
+            btnAddMoreButton.IsEnabled = false;
+            btnAddMoreButton.Width = 70;
+            btnAddMoreButton.Content = "Add More";
+            btnAddMoreButton.Name = "btnAddMoreButton" + "_Val";
+            btnAddMoreButton.FontSize = 12;
+            btnAddMoreButton.FontWeight = FontWeights.Bold;
+            btnAddMoreButton.Height = 30;
+            btnAddMoreButton.Click += btnAddMoreButton_Clicked;
+            Grid.SetRow(btnAddMoreButton, startrow + 2);
+            Grid.SetColumn(btnAddMoreButton, 2);
+
+            DynamicGrid.Children.Add(btnAddMoreButton);
+            btnAddMore= btnAddMoreButton;
+           
+            startrow++;
+
+
+          
+
+            RowDefinition gridRowMailTXFrameIdbox = new RowDefinition();
+            gridRowMailTXFrameIdbox.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowMailTXFrameIdbox);
+
+            TextBlock lblTxFrameIdBox = new TextBlock();
+            lblTxFrameIdBox.Text = "TX Message FrameId";
+            lblTxFrameIdBox.Name = "TX_MESSAGES" + "_LbL";
+            lblTxFrameIdBox.FontFamily = new FontFamily("Calibri");
+            lblTxFrameIdBox.FontSize = 14;
+            lblTxFrameIdBox.VerticalAlignment = VerticalAlignment.Center;
+            lblTxFrameIdBox.TextWrapping = TextWrapping.Wrap;
+            lblTxFrameIdBox.ToolTip = "TX Message Frame Id";
+            Grid.SetRow(lblTxFrameIdBox, startrow + 2);
+            Grid.SetColumn(lblTxFrameIdBox, 0);
+
+            DynamicGrid.Children.Add(lblTxFrameIdBox);
+
+            ComboBox drpDwnMailTxFrameIdBox = new ComboBox();
+            drpDwnMailTxFrameIdBox.Name = "MailTxS" + "_Val";
+            drpDwnMailTxFrameIdBox.FontSize = 12;
+            drpDwnMailTxFrameIdBox.FontWeight = FontWeights.Bold;
+            drpDwnMailTxFrameIdBox.Height = 30;
+            drpDwnMailTxFrameIdBox.Background = Brushes.White;
+            drpDwnMailTxFrameIdBox.IsSynchronizedWithCurrentItem = true;
+            List<String> onlyTxFrame = new List<string>();
+            foreach (KeyValuePair<string, string> kvp in messagesTxFrameIds)
+            {
+                onlyTxFrame.Add(kvp.Value);
+            }
+            drpDwnMailTxFrameIdBox.ItemsSource = onlyTxFrame;
+            
+            drpDwnMailTxFrameIdBox.SelectedIndex = 0;
+            selectMailBoxFrameId = onlyTxFrame[0];
+            drpDwnMailTxFrameIdBox.SelectionChanged += drpDwnMailTxFrameIdBox_SelectionChanged;
+            Grid.SetRow(drpDwnMailTxFrameIdBox, startrow + 2);
+            Grid.SetColumn(drpDwnMailTxFrameIdBox, 1);
+           
+
+            DynamicGrid.Children.Add(drpDwnMailTxFrameIdBox);
+            startrow++;
+            RowDefinition gridRowMailTXbox = new RowDefinition();
+            gridRowMailTXbox.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowMailTXbox);
+
+            TextBlock lblTxBox = new TextBlock();
+            lblTxBox.Text = "TX Message";
+            lblTxBox.Name = "TX_MESSAGES" + "_LbL";
+            lblTxBox.FontFamily = new FontFamily("Calibri");
+            lblTxBox.FontSize = 14;
+            lblTxBox.VerticalAlignment = VerticalAlignment.Center;
+            lblTxBox.TextWrapping = TextWrapping.Wrap;
+            lblTxBox.ToolTip = "TX Message";
+            Grid.SetRow(lblTxBox, startrow + 2);
+            Grid.SetColumn(lblTxBox, 0);
+
+            DynamicGrid.Children.Add(lblTxBox);
+
+            ComboBox drpDwnMailTxBox = new ComboBox();
+            drpDwnMailTxBox.Name = "MailTxS" + "_Val";
+            drpDwnMailTxBox.FontSize = 12;
+            drpDwnMailTxBox.FontWeight = FontWeights.Bold;
+            drpDwnMailTxBox.Height = 30;
+            drpDwnMailTxBox.Background = Brushes.White;
+            drpDwnMailTxBox.IsSynchronizedWithCurrentItem = true;
+            List<String> onlyTx = new List<string>();
+            foreach (KeyValuePair<string, string> kvp in messagesTxFrameIds)
+            {
+                onlyTx.Add(kvp.Key);
+            }
+            drpDwnMailTxBox.ItemsSource = onlyTx;
+            drpDwnMailTxBox.SelectedIndex = 0;
+            selectMailBoxMessage = onlyTx[0];
+            drpDwnMailTxBox.SelectionChanged += drpDwnMailTxBox_SelectionChanged;
+            Grid.SetRow(drpDwnMailTxBox, startrow + 2);
+            Grid.SetColumn(drpDwnMailTxBox, 1);
+
+            DynamicGrid.Children.Add(drpDwnMailTxBox);
+
+           
+            startrow++;
+            RowDefinition gridRowDLCTX = new RowDefinition();
+            gridRowDLCTX.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowDLCTX);
+            TextBlock lblDLCTX = new TextBlock();
+            lblDLCTX.Text = "DLC";
+            lblDLCTX.Name = "LBL_DLC_Value" + "_LbL";
+            lblDLCTX.FontFamily = new FontFamily("Calibri");
+            lblDLCTX.FontSize = 14;
+            lblDLCTX.VerticalAlignment = VerticalAlignment.Center;
+            lblDLCTX.TextWrapping = TextWrapping.Wrap;
+            lblDLCTX.ToolTip = "DLC";
+            Grid.SetRow(lblDLCTX, startrow + 2);
+            Grid.SetColumn(lblDLCTX, 0);
+
+            DynamicGrid.Children.Add(lblDLCTX);
+
+
+
+            TextBox txtBoxDLC = new TextBox();
+            txtBoxDLC.Text = messagesTxDLC[onlyTx[0]];
+            txtBoxDLC.FontSize = 12;
+            txtBoxDLC.FontWeight = FontWeights.Bold;
+            txtBoxDLC.Height = 30;
+            txtBoxDLC.Background = Brushes.White;
+            txtBoxDLC.TextChanged += txtBoxMaskValue_TextChanged;
+            txtBoxDLC.Name = "txtMask" + "_Val";
+            txtBoxDLC.IsEnabled = false;
+            Grid.SetRow(txtBoxDLC, startrow + 2);
+            Grid.SetColumn(txtBoxDLC, 1);
+            DynamicGrid.Children.Add(txtBoxDLC);
+
+
+            startrow++;
+            RowDefinition gridRowMaskValue = new RowDefinition();
+            gridRowMaskValue.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowMaskValue);
+            TextBlock lblMaskValueBox = new TextBlock();
+            lblMaskValueBox.Text = "Mask Value";
+            lblMaskValueBox.Name = "Mask_Value" + "_LbL";
+            lblMaskValueBox.FontFamily = new FontFamily("Calibri");
+            lblMaskValueBox.FontSize = 14;
+            lblMaskValueBox.VerticalAlignment = VerticalAlignment.Center;
+            lblMaskValueBox.TextWrapping = TextWrapping.Wrap;
+            lblMaskValueBox.ToolTip = "Mask Value";
+            Grid.SetRow(lblMaskValueBox, startrow + 2);
+            Grid.SetColumn(lblMaskValueBox, 0);
+
+            DynamicGrid.Children.Add(lblMaskValueBox);
+
+
+
+            TextBox txtBoxMaskValue = new TextBox();
+            txtBoxMaskValue.Text = "0";
+            txtBoxMaskValue.FontSize = 12;
+            txtBoxMaskValue.FontWeight = FontWeights.Bold;
+            txtBoxMaskValue.Height = 30;
+            txtBoxMaskValue.Background = Brushes.White;
+            txtBoxMaskValue.TextChanged += txtBoxMaskValue_TextChanged;
+            txtBoxMaskValue.Name = "txtMask" + "_Val";
+            txtBoxMaskValue.IsEnabled = true;
+            Grid.SetRow(txtBoxMaskValue, startrow + 2);
+            Grid.SetColumn(txtBoxMaskValue, 1);
+            DynamicGrid.Children.Add(txtBoxMaskValue);
+        }
+
+
+        private void CreateDynamicWPFGridForModuleStaticCan(String fileName)
+        {
+            fnamec = fileName.Substring(0, fileName.LastIndexOf("."));
+            ConfigGenerator.Models.DockingManagerModelHelper.GenerateCantoolsConfigurationsTxt(fileName);
+            string modulename = "StaticCanGrid";
+
+
+            // Clear any existing contents. This will help when we change modules
+            SpForDynamicGridStaticCan.Children.Clear();
+
+            // Create the Grid
+            Grid DynamicGrid = new Grid();
+            DynamicGrid.Width = 1500;
+            DynamicGrid.HorizontalAlignment = HorizontalAlignment.Left;
+            DynamicGrid.VerticalAlignment = VerticalAlignment.Top;
+            DynamicGrid.ShowGridLines = false;
+            DynamicGrid.Name = modulename;
+
+            // Create Columns
+            ColumnDefinition gridCol1 = new ColumnDefinition();
+            ColumnDefinition gridCol2 = new ColumnDefinition();
+            ColumnDefinition gridCol3 = new ColumnDefinition();
+
+
+            DynamicGrid.ColumnDefinitions.Add(gridCol1);
+            DynamicGrid.ColumnDefinitions.Add(gridCol2);
+            DynamicGrid.ColumnDefinitions.Add(gridCol3);
+
+            allNodes.Clear();
+            txMessage.Clear();
+            rxMessage.Clear();
+            txMessageWithFrameId.Clear();
+            rxMessageWithFrameId.Clear();
+            messagesTxFrameIds.Clear();
+            messagesRxFrameIds.Clear();
+            messagesTxDLC.Clear();
+            messagesTxMethod.Clear();
+            messagesRxMethod.Clear();
+            messagesTxCycleTime.Clear();
+            messagesTxCounter.Clear();
+            messagesTxRange.Clear();
+            messagesTxScale.Clear();
+            messagesTxOffset.Clear();
+            messagesTxSignal.Clear();
+            rxReceptionTimeout.Clear();
+            selectedRxMessage = "";
+            selectedTxMessage = "";
+            selectedNode = "";
+            isManual = false;
+
+
+
+            List<string> lstNetWorkNodes = new List<string>();
+            string[] alllines = File.ReadAllLines(DockingManagerModelHelper.TargetOutputFolderPath + "\\" + fileName + ".txt");
+            // string[] alllines = File.ReadAllLines(DockingManagerModelHelper.TargetOutputFolderPath + "\\" +"innn" + ".txt");
+
+            JavaScriptSerializer json_serializer = new JavaScriptSerializer();
+
+
+            Object[] objArray = (Object[])json_serializer.DeserializeObject(alllines[0]);
+            foreach (object o in objArray)
+            {
+                allNodes.Add(o.ToString());
+            }
+            Dictionary<String, Object> tx = new Dictionary<string, object>();
+            Object rx = new Object();
+            Dictionary<String, Object> frameIdsTx = new Dictionary<string, object>();
+            Dictionary<String, Object> frameIdsRx = new Dictionary<string, object>();
+            Dictionary<String, Object> MethodTx = new Dictionary<string, object>();
+            Dictionary<String, Object> MethodRx = new Dictionary<string, object>();
+            Dictionary<String, Object> dlcTx = new Dictionary<string, object>();
+            Dictionary<String, Object> ctimeTx = new Dictionary<string, object>();
+            Dictionary<String, Object> signalTx = new Dictionary<string, object>();
+            try
+            {
+                signalTx = (Dictionary<String, Object>)json_serializer.DeserializeObject(alllines[7]);
+
+            }
+            catch (Exception e)
+            {
+
+            }
+
+            try
+            {
+                ctimeTx = (Dictionary<String, Object>)json_serializer.DeserializeObject(alllines[6]);
+
+            }
+            catch (Exception e)
+            {
+
+            }
+            try
+            {
+                dlcTx = (Dictionary<String, Object>)json_serializer.DeserializeObject(alllines[4]);
+
+            }
+            catch (Exception e)
+            {
+
+            }
+
+            try
+            {
+                tx = (Dictionary<String, Object>)json_serializer.DeserializeObject(alllines[1]);
+
+            }
+            catch (Exception e)
+            {
+
+            }
+            try
+            {
+                rx = (Object)json_serializer.DeserializeObject(alllines[2]);
+
+            }
+            catch (Exception e)
+            {
+
+            }
+            try
+            {
+                frameIdsTx = (Dictionary<String, Object>)json_serializer.DeserializeObject(alllines[3]);
+
+            }
+            catch (Exception e)
+            {
+
+            }
+            try
+            {
+                frameIdsRx = (Dictionary<String, Object>)json_serializer.DeserializeObject(alllines[8]);
+
+
+            }
+            catch (Exception e)
+            {
+
+            }
+            try
+            {
+                MethodTx = (Dictionary<String, Object>)json_serializer.DeserializeObject(alllines[5]);
+
+            }
+            catch (Exception e)
+            {
+
+            }
+            try
+            {
+                MethodRx = (Dictionary<String, Object>)json_serializer.DeserializeObject(alllines[5]);
+
+            }
+            catch (Exception e)
+            {
+
+            }
+
+            foreach (KeyValuePair<String, Object> sig in signalTx)
+            {
+
+                Object[] objs = (Object[])sig.Value;
+                List<String> listSignal = new List<string>();
+                foreach (Object obj in objs)
+                {
+                    listSignal.Add(obj.ToString().Trim());
+                    messagesTxRange.Add(obj.ToString().Trim(), "0");
+                    messagesTxScale.Add(obj.ToString().Trim(), "0");
+                    messagesTxOffset.Add(obj.ToString().Trim(), "0");
+                }
+                messagesTxSignal.Add(sig.Key.Trim(), listSignal);
+
+            }
+
+
+
+            foreach (KeyValuePair<String, Object> ctime in ctimeTx)
+            {
+
+
+                messagesTxCycleTime.Add(ctime.Key, ctime.Value.ToString().Trim());
+
+
+            }
+
+            foreach (KeyValuePair<String, Object> fid in frameIdsTx)
+            {
+
+
+                messagesTxFrameIds.Add(fid.Key, fid.Value.ToString().Trim());
+
+
+            }
+            foreach (KeyValuePair<String, Object> dlc in dlcTx)
+            {
+
+
+                messagesTxDLC.Add(dlc.Key, dlc.Value.ToString().Trim());
+
+
+            }
+            foreach (KeyValuePair<String, Object> fid in frameIdsRx)
+            {
+
+
+                messagesRxFrameIds.Add(fid.Key.Trim(), fid.Value.ToString().Trim());
+
+
+            }
+            foreach (KeyValuePair<String, Object> mthd in MethodTx)
+            {
+                string txm = mthd.Value.ToString().Trim();
+
+                if (txm.Equals("Combined(Event/Periodic)"))
+                {
+                    txm = "Combined";
+
+                }
+
+                messagesTxMethod.Add(mthd.Key.Trim(), txm);
+
+
+            }
+            foreach (KeyValuePair<String, Object> mthd in MethodRx)
+            {
+                string rxm = mthd.Value.ToString().Trim();
+
+                if (rxm.Equals("Combined(Event/Periodic)"))
+                {
+                    rxm = "Combined";
+
+                }
+
+                messagesRxMethod.Add(mthd.Key.Trim(), rxm);
+
+
+            }
+            foreach (KeyValuePair<String, Object> t in tx)
+            {
+
+                Object[] objs = (Object[])t.Value;
+                List<string> listTxMessage = new List<string>();
+                List<string> listTxMessageWithFameId = new List<string>();
+                foreach (object obj in objs)
+                {
+                    String svalue = "";
+                    messagesTxFrameIds.TryGetValue(obj.ToString(), out svalue);
+
+                    listTxMessageWithFameId.Add(obj.ToString() + "(" + svalue + ")");
+                    listTxMessage.Add(obj.ToString());
+                }
+                txMessageWithFrameId.Add(t.Key, listTxMessageWithFameId);
+                txMessage.Add(t.Key, listTxMessage);
+
+
+            }
+
+
+            if (rx != null)
+            {
+
+
+                Object[] objs = (Object[])rx;
+
+                if (objs != null && objs.Length > 0)
+                {
+                    foreach (object ob in objs)
+                    {
+                        Object[] obNodeValues = (Object[])ob;
+                        string rxValue = obNodeValues[0].ToString();
+                        Object[] nodes = (Object[])obNodeValues[1];
+                        foreach (Object nodeObject in nodes)
+                        {
+                            String node = (String)nodeObject;
+                            if (rxMessage.ContainsKey(node))
+                            {
+                                List<String> rxm = new List<string>();
+                                List<String> rxmFrmeId = new List<string>();
+
+                                rxMessage.TryGetValue(node, out rxm);
+                                rxMessageWithFrameId.TryGetValue(node, out rxmFrmeId);
+
+
+                                if (!rxm.Contains(rxValue))
+                                {
+                                    rxm.Add(rxValue);
+                                    String frmaeid = "";
+                                    messagesRxFrameIds.TryGetValue(rxValue, out frmaeid);
+                                    rxmFrmeId.Add(rxValue + "(" + frmaeid + ")");
+
+                                }
+                            }
+                            else
+                            {
+                                List<String> rxm = new List<string>();
+                                List<String> rxmFrmeId = new List<string>();
+
+
+                                rxm.Add(rxValue);
+                                String frmaeid = "";
+                                messagesRxFrameIds.TryGetValue(rxValue, out frmaeid);
+                                rxmFrmeId.Add(rxValue + "(" + frmaeid + ")");
+                                rxMessage.Add(node, rxm);
+                                rxMessageWithFrameId.Add(node, rxmFrmeId);
+                            }
+                        }
+                    }
+
+
+                }
+
+
+
+            }
+
+
+
+
+
+
+
+
+
+
+            RowDefinition gridRowNetWork = new RowDefinition();
+            gridRowNetWork.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowNetWork);
+
+            TextBlock lblNetworkNode = new TextBlock();
+            lblNetworkNode.Text = "NetWork Nodes";
+            lblNetworkNode.Name = "NetWork_Nodes" + "_LbL";
+            lblNetworkNode.FontFamily = new FontFamily("Calibri");
+            lblNetworkNode.FontSize = 14;
+            lblNetworkNode.VerticalAlignment = VerticalAlignment.Center;
+            lblNetworkNode.TextWrapping = TextWrapping.Wrap;
+            lblNetworkNode.ToolTip = "NetWork Nodes".Trim();
+            Grid.SetRow(lblNetworkNode, 0);
+            Grid.SetColumn(lblNetworkNode, 0);
+
+            DynamicGrid.Children.Add(lblNetworkNode);
+
+
+            ComboBox drpDwnNetworkBox = new ComboBox();
+            drpDwnNetworkBox.Name = "ComboNetworkNode" + "_Val";
+            drpDwnNetworkBox.FontSize = 12;
+            drpDwnNetworkBox.FontWeight = FontWeights.Bold;
+            drpDwnNetworkBox.Height = 30;
+            drpDwnNetworkBox.Background = Brushes.White;
+            drpDwnNetworkBox.IsSynchronizedWithCurrentItem = true;
+            drpDwnNetworkBox.SelectedIndex = 0;
+            drpDwnNetworkBox.ItemsSource = allNodes.ToList();
+            drpDwnNetworkBox.SelectionChanged += drpDwnNetworkBox_SelectionChanged;
+
+            Grid.SetRow(drpDwnNetworkBox, 0);
+            Grid.SetColumn(drpDwnNetworkBox, 1);
+            selectedNode = allNodes[0];
+
+
+
+
+
+            DynamicGrid.Children.Add(drpDwnNetworkBox);
+
+
+
+
+
+
+
+
+            RowDefinition gridRowNetWorkNode = new RowDefinition();
+            gridRowNetWorkNode.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowNetWorkNode);
+
+
+            TextBlock lblTxNetworkNode = new TextBlock();
+            lblTxNetworkNode.Text = "Tx Messages";
+            lblTxNetworkNode.Name = "Tx_Messages" + "_LbL";
+            lblTxNetworkNode.FontFamily = new FontFamily("Calibri");
+            lblTxNetworkNode.FontSize = 14;
+            lblTxNetworkNode.VerticalAlignment = VerticalAlignment.Center;
+            lblTxNetworkNode.TextWrapping = TextWrapping.Wrap;
+            lblTxNetworkNode.ToolTip = "Tx Messages".Trim();
+            Grid.SetRow(lblTxNetworkNode, 1);
+            Grid.SetColumn(lblTxNetworkNode, 0);
+
+            DynamicGrid.Children.Add(lblTxNetworkNode);
+
+
+            ComboBox drpDwnTxNetworkBox = new ComboBox();
+            drpDwnTxNetworkBox.Name = "ComboNetworkNodeTx" + "_Val";
+            drpDwnTxNetworkBox.FontSize = 12;
+            drpDwnTxNetworkBox.FontWeight = FontWeights.Bold;
+            drpDwnTxNetworkBox.Height = 30;
+            drpDwnTxNetworkBox.Background = Brushes.White;
+            drpDwnTxNetworkBox.IsSynchronizedWithCurrentItem = true;
+            drpDwnTxNetworkBox.SelectedIndex = 0;
+            //   drpDwnTxNetworkBox.SelectionChanged += drpDwnTxNetworkBox_SelectionChanged;
+            Grid.SetRow(drpDwnTxNetworkBox, 1);
+
+            Grid.SetColumn(drpDwnTxNetworkBox, 1);
+
+
+
+            List<String> lvaluesTx = new List<String>();
+            txMessageWithFrameId.TryGetValue(allNodes[0], out lvaluesTx);
+            if (lvaluesTx != null)
+            {
+                drpDwnTxNetworkBox.ItemsSource = lvaluesTx.ToList();
+                drpDwnTxNetworkBox.SelectionChanged += drpDwnTxNetworkBox_SelectionChanged;
+
+            }
+            else
+            {
+                lvaluesTx = new List<String>();
+                drpDwnTxNetworkBox.ItemsSource = lvaluesTx.ToList();
+            }
+
+
+
+            DynamicGrid.Children.Add(drpDwnTxNetworkBox);
+
+            RowDefinition gridRowtXNetWorkNode = new RowDefinition();
+            gridRowtXNetWorkNode.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowtXNetWorkNode);
+
+            TextBlock lblRxNetworkNode = new TextBlock();
+            lblRxNetworkNode.Text = "Rx Messages";
+            lblRxNetworkNode.Name = "Rx_Messages" + "_LbL";
+            lblRxNetworkNode.FontFamily = new FontFamily("Calibri");
+            lblRxNetworkNode.FontSize = 14;
+            lblRxNetworkNode.VerticalAlignment = VerticalAlignment.Center;
+            lblRxNetworkNode.TextWrapping = TextWrapping.Wrap;
+            lblRxNetworkNode.ToolTip = "Rx Messages".Trim();
+            Grid.SetRow(lblRxNetworkNode, 2);
+            Grid.SetColumn(lblRxNetworkNode, 0);
+
+            DynamicGrid.Children.Add(lblRxNetworkNode);
+
+
+            ComboBox drpDwnRxNetworkBox = new ComboBox();
+            drpDwnRxNetworkBox.Name = "ComboNetworkNodeRx" + "_Val";
+            drpDwnRxNetworkBox.FontSize = 12;
+            drpDwnRxNetworkBox.FontWeight = FontWeights.Bold;
+            drpDwnRxNetworkBox.Height = 30;
+            drpDwnRxNetworkBox.Background = Brushes.White;
+            drpDwnRxNetworkBox.IsSynchronizedWithCurrentItem = true;
+            drpDwnRxNetworkBox.SelectedIndex = 0;
+
+            Grid.SetRow(drpDwnRxNetworkBox, 2);
+
+            Grid.SetColumn(drpDwnRxNetworkBox, 1);
+
+
+
+            List<String> lvaluesRx = new List<String>();
+            rxMessageWithFrameId.TryGetValue(allNodes[0], out lvaluesRx);
+            if (lvaluesRx != null)
+            {
+                drpDwnRxNetworkBox.ItemsSource = (lvaluesRx).ToList();
+                drpDwnRxNetworkBox.SelectionChanged += drpDwnRxNetworkBox_SelectionChanged;
+            }
+            else
+            {
+                lvaluesRx = new List<String>();
+                drpDwnRxNetworkBox.ItemsSource = (lvaluesRx).ToList();
+            }
+
+
+            DynamicGrid.Children.Add(drpDwnRxNetworkBox);
+
+
+
+
+            RowDefinition gridRowSignal = new RowDefinition();
+            gridRowSignal.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowSignal);
+
+            TextBlock lblSignal = new TextBlock();
+            lblSignal.Text = "Signal";
+            lblSignal.Name = "Signal" + "_LbL";
+            lblSignal.FontFamily = new FontFamily("Calibri");
+            lblSignal.FontSize = 14;
+            lblSignal.VerticalAlignment = VerticalAlignment.Center;
+            lblSignal.TextWrapping = TextWrapping.Wrap;
+            lblSignal.ToolTip = "Signal".Trim();
+            Grid.SetRow(lblSignal, 3);
+            Grid.SetColumn(lblSignal, 0);
+
+            DynamicGrid.Children.Add(lblSignal);
+
+
+            ComboBox drpDwnSignal = new ComboBox();
+            drpDwnSignal.Name = "ComboSignal" + "_Val";
+            drpDwnSignal.FontSize = 12;
+            drpDwnSignal.FontWeight = FontWeights.Bold;
+            drpDwnSignal.Height = 30;
+            drpDwnSignal.Background = Brushes.White;
+            drpDwnSignal.IsSynchronizedWithCurrentItem = true;
+            drpDwnSignal.SelectedIndex = 0;
+            // drpDwnTxNetworkBox.SelectionChanged += drpDwnMailBox_SelectionChanged;
+            Grid.SetRow(drpDwnSignal, 3);
+
+            Grid.SetColumn(drpDwnSignal, 1);
+
+
+            if (lvaluesTx != null && lvaluesTx.Count > 0)
+            {
+                List<String> lvaluesSignal = new List<String>();
+                messagesTxSignal.TryGetValue(lvaluesTx[0].Substring(0, lvaluesTx[0].IndexOf("(")), out lvaluesSignal);
+                if (lvaluesSignal != null && lvaluesSignal.Count > 0)
+                {
+                    selectedSignal = lvaluesSignal[0];
+                    drpDwnSignal.ItemsSource = (lvaluesSignal).ToList();
+                    drpDwnSignal.SelectionChanged += drpDwnSignal_SelectionChanged;
+                }
+                else
+                {
+                    lvaluesSignal = new List<String>();
+                    drpDwnSignal.ItemsSource = (lvaluesSignal).ToList();
+                    selectedSignal = "";
+                }
+
+
+            }
+            else
+            {
+                List<String> lvaluesSignal = new List<String>();
+                drpDwnSignal.ItemsSource = (lvaluesSignal).ToList();
+                selectedSignal = "";
+            }
+
+
+            DynamicGrid.Children.Add(drpDwnSignal);
+            if (lvaluesRx != null && lvaluesRx.Count > 0)
+            {
+                selectedRxMessage = lvaluesRx[0].Substring(0, lvaluesRx[0].IndexOf("("));
+            }
+            else
+            {
+                selectedRxMessage = "";
+            }
+
+
+            RowDefinition gridRowRange = new RowDefinition();
+            gridRowRange.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowRange);
+
+
+            TextBlock lblRange = new TextBlock();
+            lblRange.Text = "Range";
+            lblRange.Name = "Range" + "_LbL";
+            lblRange.FontFamily = new FontFamily("Calibri");
+            lblRange.FontSize = 14;
+            lblRange.VerticalAlignment = VerticalAlignment.Center;
+            lblRange.TextWrapping = TextWrapping.Wrap;
+            lblRange.ToolTip = "Range".Trim();
+            Grid.SetRow(lblRange, 4);
+            Grid.SetColumn(lblRange, 0);
+
+            DynamicGrid.Children.Add(lblRange);
+
+
+            TextBox txtBoxRange = new TextBox();
+            txtBoxRange.Text = "0";
+            txtBoxRange.FontSize = 12;
+            txtBoxRange.FontWeight = FontWeights.Bold;
+            txtBoxRange.Height = 30;
+            txtBoxRange.Background = Brushes.White;
+            txtBoxRange.TextChanged += txtBoxRange_TextChanged;
+            txtBoxRange.Name = "txtRange" + "_Val";
+            txtBoxRange.IsEnabled = isManual;
+
+
+
+
+            Grid.SetRow(txtBoxRange, 4);
+            Grid.SetColumn(txtBoxRange, 1);
+
+            DynamicGrid.Children.Add(txtBoxRange);
+
+
+
+            RowDefinition gridRowScale = new RowDefinition();
+            gridRowScale.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowScale);
+
+
+            TextBlock lblScale = new TextBlock();
+            lblScale.Text = "Scale";
+            lblScale.Name = "Sacle" + "_LbL";
+            lblScale.FontFamily = new FontFamily("Calibri");
+            lblScale.FontSize = 14;
+            lblScale.VerticalAlignment = VerticalAlignment.Center;
+            lblScale.TextWrapping = TextWrapping.Wrap;
+            lblScale.ToolTip = "NetWork Nodes".Trim();
+            Grid.SetRow(lblScale, 5);
+            Grid.SetColumn(lblScale, 0);
+
+            DynamicGrid.Children.Add(lblScale);
+
+
+            TextBox txtBoxScale = new TextBox();
+            txtBoxScale.Text = "0";
+            txtBoxScale.FontSize = 12;
+            txtBoxScale.FontWeight = FontWeights.Bold;
+            txtBoxScale.Height = 30;
+            txtBoxScale.Background = Brushes.White;
+            txtBoxScale.TextChanged += txtBoxScale_TextChanged;
+            txtBoxScale.Name = "txtSacle" + "_Val";
+            txtBoxScale.IsEnabled = isManual;
+
+            Grid.SetRow(txtBoxScale, 5);
+            Grid.SetColumn(txtBoxScale, 1);
+
+            DynamicGrid.Children.Add(txtBoxScale);
+
+
+            RowDefinition gridRowOffset = new RowDefinition();
+            gridRowOffset.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowOffset);
+
+
+            TextBlock lblOffset = new TextBlock();
+            lblOffset.Text = "Offset";
+            lblOffset.Name = "Offset" + "_LbL";
+            lblOffset.FontFamily = new FontFamily("Calibri");
+            lblOffset.FontSize = 14;
+            lblOffset.VerticalAlignment = VerticalAlignment.Center;
+            lblOffset.TextWrapping = TextWrapping.Wrap;
+            lblOffset.ToolTip = "NetWork Nodes".Trim();
+            Grid.SetRow(lblOffset, 6);
+            Grid.SetColumn(lblOffset, 0);
+
+            DynamicGrid.Children.Add(lblOffset);
+
+
+            TextBox txtBoxOffset = new TextBox();
+            txtBoxOffset.Text = "0";
+            txtBoxOffset.FontSize = 12;
+            txtBoxOffset.FontWeight = FontWeights.Bold;
+            txtBoxOffset.Height = 30;
+            txtBoxOffset.Background = Brushes.White;
+            txtBoxOffset.TextChanged += txtBoxOffset_TextChanged;
+            txtBoxOffset.Name = "txtOffset" + "_Val";
+            txtBoxOffset.IsEnabled = isManual;
+            Grid.SetRow(txtBoxOffset, 6);
+            Grid.SetColumn(txtBoxOffset, 1);
+
+            DynamicGrid.Children.Add(txtBoxOffset);
+
+
+
+
+
+            RowDefinition gridRowReceptionTime = new RowDefinition();
+            gridRowReceptionTime.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowReceptionTime);
+
+
+            TextBlock lblReceptionTime = new TextBlock();
+            lblReceptionTime.Text = "Reception Time";
+            lblReceptionTime.Name = "ReceptionTime" + "_LbL";
+            lblReceptionTime.FontFamily = new FontFamily("Calibri");
+            lblReceptionTime.FontSize = 14;
+            lblReceptionTime.VerticalAlignment = VerticalAlignment.Center;
+            lblReceptionTime.TextWrapping = TextWrapping.Wrap;
+            lblReceptionTime.ToolTip = "Reception Time".Trim();
+            Grid.SetRow(lblReceptionTime, 7);
+            Grid.SetColumn(lblReceptionTime, 0);
+
+            DynamicGrid.Children.Add(lblReceptionTime);
+
+
+            TextBox txtBoxReceptionTime = new TextBox();
+            txtBoxReceptionTime.Text = "0";
+            txtBoxReceptionTime.FontSize = 12;
+            txtBoxReceptionTime.FontWeight = FontWeights.Bold;
+            txtBoxReceptionTime.Height = 30;
+            txtBoxReceptionTime.Background = Brushes.White;
+            txtBoxReceptionTime.TextChanged += txtBoxReceptionTime_TextChanged;
+            txtBoxReceptionTime.Name = "txtReceptionTime" + "_Val";
+            txtBoxReceptionTime.IsEnabled = isManual;
+            Grid.SetRow(txtBoxReceptionTime, 7);
+            Grid.SetColumn(txtBoxReceptionTime, 1);
+
+            DynamicGrid.Children.Add(txtBoxReceptionTime);
+
+
+            RowDefinition gridRowRxTx = new RowDefinition();
+            gridRowRxTx.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowRxTx);
+
+            TextBlock lblTXRX = new TextBlock();
+            lblTXRX.Text = "Select Type";
+            lblTXRX.Name = "TxRx" + "_LbL";
+            lblTXRX.FontFamily = new FontFamily("Calibri");
+            lblTXRX.FontSize = 14;
+            lblTXRX.VerticalAlignment = VerticalAlignment.Center;
+            lblTXRX.TextWrapping = TextWrapping.Wrap;
+            lblTXRX.ToolTip = "Select Type".Trim();
+            Grid.SetRow(lblTXRX, 8);
+            Grid.SetColumn(lblTXRX, 0);
+
+            DynamicGrid.Children.Add(lblTXRX);
+
+
+            ComboBox drpDwnTxRx = new ComboBox();
+            drpDwnTxRx.Name = "ComboTxRx" + "_Val";
+            drpDwnTxRx.FontSize = 12;
+            drpDwnTxRx.FontWeight = FontWeights.Bold;
+            drpDwnTxRx.Height = 30;
+            drpDwnTxRx.Background = Brushes.White;
+            drpDwnTxRx.IsSynchronizedWithCurrentItem = true;
+            drpDwnTxRx.SelectedIndex = 0;
+
+
+            List<string> rxTxType = new List<string>();
+            rxTxType.Add("Transmission");
+            rxTxType.Add("Receiver");
+            drpDwnTxRx.ItemsSource = rxTxType;
+            selectedType = rxTxType[0];
+            drpDwnTxRx.SelectionChanged += drpDwnTxRx_SelectionChanged;
+            Grid.SetRow(drpDwnTxRx, 8);
+            Grid.SetColumn(drpDwnTxRx, 1);
+            DynamicGrid.Children.Add(drpDwnTxRx);
+
+
+            RowDefinition gridRowCheckBox = new RowDefinition();
+            gridRowCheckBox.Height = new GridLength(45);
+            DynamicGrid.RowDefinitions.Add(gridRowCheckBox);
+
+            TextBlock lblChekBoxText = new TextBlock();
+            lblChekBoxText.Text = "Manual configuration";
+            lblChekBoxText.Name = "Manual_configuration" + "_Val";
+            lblChekBoxText.FontFamily = new FontFamily("Calibri");
+            lblChekBoxText.FontSize = 14;
+            lblChekBoxText.VerticalAlignment = VerticalAlignment.Center;
+            lblChekBoxText.TextWrapping = TextWrapping.Wrap;
+            lblChekBoxText.ToolTip = "Manual configuration";
+
+            Grid.SetRow(lblChekBoxText, 9);
+            Grid.SetColumn(lblChekBoxText, 0);
+
+            DynamicGrid.Children.Add(lblChekBoxText);
+
+            // Add the Checkbox to enable of disable Manual configuration
+            CheckBox chkBoxEnableDisableManualConfiguration = new CheckBox();
+            chkBoxEnableDisableManualConfiguration.IsChecked = false;
+            chkBoxEnableDisableManualConfiguration.FontSize = 12;
+            chkBoxEnableDisableManualConfiguration.FontWeight = FontWeights.Bold;
+            chkBoxEnableDisableManualConfiguration.Height = 15;
+            chkBoxEnableDisableManualConfiguration.Margin = new Thickness(5, 0, 0, 0);
+            chkBoxEnableDisableManualConfiguration.Name = "chkBoxEnableDisableManualConfiguration" + "_Val";
+            chkBoxEnableDisableManualConfiguration.Background = Brushes.White;
+            chkBoxEnableDisableManualConfiguration.Click += chkBoxEnableDisableManualConfiguration_Clicked;
+            Grid.SetRow(chkBoxEnableDisableManualConfiguration, 9);
+            Grid.SetColumn(chkBoxEnableDisableManualConfiguration, 1);
+
+            DynamicGrid.Children.Add(chkBoxEnableDisableManualConfiguration);
+
+
+            // Display grid into a Window
+            SpForDynamicGridStaticCan.Children.Add(DynamicGrid);
+            try
+            {
+                File.Delete(DockingManagerModelHelper.TargetOutputFolderPath + "\\" + fileName + ".txt");
+            }
+            catch (Exception e) { }
+
+        }
+
+        private void ChkBox_Click(object sender, RoutedEventArgs e)
+        {
+            var cb = sender as CheckBox;
+            var grd = SpForDynamicGrid.Children.OfType<Grid>().FirstOrDefault();
+
+            if (grd != null)
+            {
+                var currSelectedMailBox = grd.Children
+                                            .OfType<ComboBox>()
+                                            .Where(cbx => cbx.Name == "CAN_DRIVER_MAILBOX_INTERRUPT_PRIORITY_Val")
+                                            .FirstOrDefault();
+                var c4 = currSelectedMailBox as System.Windows.Controls.ComboBox;
+                c4.IsEnabled = (bool)cb.IsChecked;
+            }
+
+        }
+        private void chkBoxEnableDisableManualConfiguration_Clicked(object sender, RoutedEventArgs e)
+        {
+            var cb = sender as CheckBox;
+            isManual = (bool)cb.IsChecked;
+            var textBoxRange = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[0];
+            var textBoxScale = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[1];
+            var textBoxOffset = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[2];
+            var textBoxReceptionTime = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[3];
+
+            textBoxRange.IsEnabled = isManual;
+            textBoxScale.IsEnabled = isManual;
+            textBoxOffset.IsEnabled = isManual;
+            textBoxReceptionTime.IsEnabled = isManual;
+
+
+
+
+
+        }
+
+        private void MailboxCtrl_Clicked(object sender, RoutedEventArgs e)
+        {
+            var cb = sender as CheckBox;
+
+            var grd = SpForDynamicGrid.Children.OfType<Grid>().FirstOrDefault();
+
+            if (grd != null)
+            {
+                var currSelectedMailBox = grd.Children
+                                            .OfType<ComboBox>()
+                                            .Where(cbx => cbx.Name == cb.Name.ToString())
+                                            .FirstOrDefault();
+                if (currSelectedMailBox != null)
+                {
+                    var currSelectedMailBoxCB = grd.Children
+                                                .OfType<CheckBox>()
+                                                .Where(cbx => cbx.Name == currSelectedMailBox.Name.ToString())
+                                                .FirstOrDefault();
+
+                    if (currSelectedMailBoxCB != null)
+                    {
+                        var a1 = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(a => a.SHORTNAME == DockingManagerModelHelper.ModuleName).FirstOrDefault();
+                        var a2 = a1.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Where(b => b.SUBCONTAINERS.Length > 1).FirstOrDefault();
+                        var currentConfigParamChild = a2.SUBCONTAINERS.Where(c => c.SHORTNAME.Equals(currSelectedMailBox.SelectedValue.ToString(), StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
+
+                        // Update the user input value back to the object
+                        currentConfigParamChild.PARAMETERVALUES.VALUE.Value = (bool)cb.IsChecked ? "ENABLE" : "DISABLE";
+
+                        //Below loop will is used to change enable/disable the child controls.
+                        foreach (var child in grd.Children)
+                        {
+                            switch (child.GetType().Name.ToLower())
+                            {
+                                case "textbox":
+                                    var c2 = child as System.Windows.Controls.TextBox;
+                                    string str = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c2.Name.Substring(0, c2.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                    if (c2.Name.Equals(str + "_Val", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        c2.IsEnabled = (bool)cb.IsChecked;
+                                    }
+                                    break;
+                                case "checkbox":
+                                    var c3 = child as System.Windows.Controls.CheckBox;
+                                    string strCB = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c3.Name.Substring(0, c3.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                    if (c3.Name.Equals(strCB + "_Val", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        c3.IsEnabled = (bool)cb.IsChecked;
+                                    }
+                                    break;
+                                case "combobox":
+                                    var c4 = child as System.Windows.Controls.ComboBox;
+                                    string strCmb = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c4.Name.Substring(0, c4.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                    if (c4.Name.Equals(strCmb + "_Val", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        c4.IsEnabled = (bool)cb.IsChecked;
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void TxtBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tb = sender as TextBox;
+
+            var tempParamName = tb.Name.Remove(tb.Name.Length - 4);
+
+            var obj = RetrieveConfigParamObject(tempParamName);
+
+            string MinimumValue = obj.PARAMETERVALUES.SUPPORTEDVALUES.MinValue.ToString();
+            string MaximumValue = obj.PARAMETERVALUES.SUPPORTEDVALUES.MaxValue.ToString();
+
+            uint userInput;
+            bool parseSuccess = uint.TryParse(tb.Text, System.Globalization.NumberStyles.HexNumber, null, out userInput);
+
+            uint minvalue;
+            parseSuccess = uint.TryParse(obj.PARAMETERVALUES.SUPPORTEDVALUES.MinValue.ToString(), System.Globalization.NumberStyles.HexNumber, null, out minvalue);
+
+            uint maxvalue;
+            parseSuccess = uint.TryParse(obj.PARAMETERVALUES.SUPPORTEDVALUES.MaxValue.ToString(), System.Globalization.NumberStyles.HexNumber, null, out maxvalue);
+
+            if ((userInput < minvalue) || (userInput > maxvalue))
+            {
+                // Validation failed, Throw erro msg and take the focus back to the textbox
+                MessageBox.Show(String.Format("Entered value of {0} should be between {1} and {2}, both values included", obj.PARAMETERVALUES.DEFINITIONREF.name, MinimumValue, MaximumValue));
+                tb.Text = obj.PARAMETERVALUES.VALUE.Value.ToString();
+            }
+        }
+        private void drpDwnMailTxBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+           if(isChanged)
+            {
+            var dd = (sender as ComboBox);
+            string selectedMailTx = (string)dd.SelectedItem;
+                selectMailBoxMessage = selectedMailTx;
+            var drMailTxFrameIdBox = SpForDynamicGrid.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[6];
+            drMailTxFrameIdBox.SelectedIndex = dd.SelectedIndex;
+                selectMailBoxFrameId = (string)dd.SelectedItem;
+                            var txtBocxDlc = SpForDynamicGrid.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[4];
+            txtBocxDlc.Text = messagesTxDLC[selectedMailTx];
+            if (selectedMailCanIf.Equals("CANIF_TxBasicCANMailbox")&& !mailBoxMessage.ContainsKey(selectedMailBox))
+            {
+                if (mailBoxMessage != null)
+                {
+                    mailBoxMessage[selectedMailBox] = selectedMailTx;
+
+                }
+                if (mailBoxFrameId != null)
+                {
+                    mailBoxFrameId[selectedMailBox] = (string)drMailTxFrameIdBox.SelectedItem;
+                }
+                if (mailBoxDLC != null)
+                {
+                    mailBoxDLC[selectedMailBox] = txtBocxDlc.Text;
+                }
+            }
+            else
+            {
+                if (mailBoxMessage != null)
+                {
+                    mailBoxMessage[selectedMailBox] = selectedMailTx;
+
+                }
+                if (mailBoxFrameId != null)
+                {
+                    mailBoxFrameId[selectedMailBox] = (string)drMailTxFrameIdBox.SelectedItem;
+                }
+                if (mailBoxDLC != null)
+                {
+                    mailBoxDLC[selectedMailBox] = txtBocxDlc.Text;
+                }
+            }
+            }
+
+        }
+        private void drpDwnMailTxFrameIdBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+           if(isChanged)
+            { 
+            var dd = (sender as ComboBox);
+            string selectedMailTxFrameId = (string)dd.SelectedItem;
+            var drMailTx = SpForDynamicGrid.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[7];
+            drMailTx.SelectedIndex = dd.SelectedIndex;
+            var txtBocxDlc = SpForDynamicGrid.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[4];
+            txtBocxDlc.Text = messagesTxDLC[(string)drMailTx.SelectedItem];
+
+            if (mailBoxMessage != null)
+            {
+                mailBoxMessage[selectedMailBox] = (string)drMailTx.SelectedItem;
+                    selectMailBoxMessage = (string)drMailTx.SelectedItem;
+
+            }
+            if (mailBoxFrameId != null)
+            {
+                mailBoxFrameId[selectedMailBox] = selectedMailTxFrameId;
+                   
+            }
+            if (mailBoxDLC != null)
+            {
+                mailBoxDLC[selectedMailBox] = txtBocxDlc.Text;
+                    selectMailBoxDLC = txtBocxDlc.Text;
+            }
+            }
+
+        }
+        private void drpDwnMailCanIfBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var dd = (sender as ComboBox);
+             selectedMailCanIf = (string)dd.SelectedItem;
+            if(selectedMailCanIf!=null&&!selectedMailCanIf.Trim().Equals(""))
+            {
+
+                if (mailBoxCanif.ContainsKey(selectedMailBox))
+                {
+                    mailBoxCanif[selectedMailBox] = selectedMailCanIf;
+                }
+                else
+                {
+                    mailBoxCanif.Add(selectedMailBox, selectedMailCanIf);
+                }
+                if (selectedMailCanIf.Equals("CANIF_TxBasicCANMailbox"))
+                {
+                    if (btnAddMore != null)
+                    {
+                        btnAddMore.IsEnabled = true;
+                    }
+                }
+                else
+                {
+                    if (btnAddMore != null)
+                    {
+                        btnAddMore = SpForDynamicGrid.Children.OfType<Grid>().ToList()[0].Children.OfType<Button>().ToList()[0];
+                        btnAddMore.IsEnabled = false;
+                        
+                    }
+                }
+            }
+           
+            
+           
+        }
+        private void drpDwnTxRx_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+
+            var dd = (sender as ComboBox);
+            selectedType = (string)dd.SelectedItem;
+        }
+        private void drpDwnRxNetworkBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var textReceptionTimeout = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[3];
+            textReceptionTimeout.Text = "";
+            var dd = (sender as ComboBox);
+            string sItem = (string)dd.SelectedItem;
+            if (sItem != null && !sItem.Equals(""))
+            {
+                selectedRxMessage = sItem.Substring(0, sItem.IndexOf("("));
+                if (rxReceptionTimeout.ContainsKey(selectedRxMessage))
+                {
+                    textReceptionTimeout.Text = rxReceptionTimeout[selectedRxMessage];
+                }
+            }
+            else
+            {
+                selectedRxMessage = "";
+            }
+        }
+        private void drpDwnTxNetworkBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var dd = (sender as ComboBox);
+            string sItem = (string)dd.SelectedItem;
+            if (sItem != null && !sItem.Equals(""))
+            {
+                selectedTxMessage = sItem.Substring(0, sItem.IndexOf("("));
+            }
+            else
+            {
+                selectedTxMessage = "";
+            }
+            var drpDwnSignal = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[3];
+            var textBoxRange = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[0];
+            var textBoxScale = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[1];
+            var textBoxOffset = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[2];
+
+            if (selectedTxMessage != null && !selectedTxMessage.Equals(""))
+            {
+                List<String> lvaluesSignal = new List<String>();
+                messagesTxSignal.TryGetValue(selectedTxMessage, out lvaluesSignal);
+                if (lvaluesSignal != null && lvaluesSignal.Count > 0)
+                {
+                    selectedSignal = lvaluesSignal[0];
+                    drpDwnSignal.ItemsSource = (lvaluesSignal).ToList();
+                    textBoxRange.Text = messagesTxRange[selectedSignal];
+                    textBoxScale.Text = messagesTxScale[selectedSignal];
+                    textBoxOffset.Text = messagesTxOffset[selectedSignal];
+                }
+                else
+                {
+                    selectedTxMessage = "";
+                    lvaluesSignal = new List<String>();
+                    drpDwnSignal.ItemsSource = (lvaluesSignal).ToList();
+                    selectedSignal = "";
+                    textBoxRange.Text = "";
+                    textBoxScale.Text = "";
+                    textBoxOffset.Text = "";
+                }
+
+            }
+            else
+            {
+                selectedTxMessage = "";
+                List<String> lvaluesSignal = new List<String>();
+                drpDwnSignal.ItemsSource = (lvaluesSignal).ToList();
+                selectedSignal = "";
+                textBoxRange.Text = "";
+                textBoxScale.Text = "";
+                textBoxOffset.Text = "";
+            }
+
+        }
+        private void txtBoxMaskValue_TextChanged(object sender, EventArgs e)
+        {
+            var tx = (sender as TextBox);
+            string txValue = tx.Text;
+           
+            if (txValue!=null&&!txValue.Trim().Equals(""))
+            {
+                selectMailBoxMaskValue = txValue;
+                if (selectedMailCanIf.Equals("CANIF_TxBasicCANMailbox"))
+                { 
+                    if(!mailBoxMaskValue.ContainsKey(selectedMailBox))
+                    {
+                        mailBoxMaskValue.Add(selectedMailBox, txValue.Trim());
+                    }
+                }else
+                {
+                    mailBoxMaskValue[selectedMailBox] = txValue.Trim();
+                }
+                   
+            }
+        }
+        private void txtBoxRange_TextChanged(object sender, EventArgs e)
+        {
+            var tx = (sender as TextBox);
+            string txValue = tx.Text;
+            if (selectedSignal != null && !selectedSignal.Equals("") && txValue != null && !txValue.Trim().Equals(""))
+            {
+                messagesTxRange[selectedSignal] = txValue;
+            }
+
+
+
+        }
+        private void txtBoxScale_TextChanged(object sender, EventArgs e)
+        {
+            var tx = (sender as TextBox);
+            string txValue = tx.Text;
+            if (selectedSignal != null && !selectedSignal.Equals("") && txValue != null && !txValue.Trim().Equals(""))
+            {
+                messagesTxScale[selectedSignal] = txValue;
+            }
+
+
+
+        }
+        private void txtBoxReceptionTime_TextChanged(object sender, EventArgs e)
+        {
+            var tx = (sender as TextBox);
+            string txValue = tx.Text;
+            if (selectedRxMessage != null && !selectedRxMessage.Equals("") && txValue != null && !txValue.Trim().Equals(""))
+            {
+                if (rxReceptionTimeout.ContainsKey(selectedRxMessage))
+                {
+                    rxReceptionTimeout[selectedRxMessage] = txValue;
+                }
+                else
+                {
+                    rxReceptionTimeout.Add(selectedRxMessage, txValue);
+                }
+            }
+
+        }
+
+        private void txtBoxOffset_TextChanged(object sender, EventArgs e)
+        {
+            var tx = (sender as TextBox);
+            string txValue = tx.Text;
+            if (selectedSignal != null && !selectedSignal.Equals("") && txValue != null && !txValue.Trim().Equals(""))
+            {
+                messagesTxOffset[selectedSignal] = txValue;
+            }
+
+
+
+        }
+
+
+        private void drpDwnSignal_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var dd = (sender as ComboBox);
+            string sItem = (string)dd.SelectedItem;
+            selectedSignal = sItem;
+            if (selectedSignal != null && !selectedSignal.Trim().Equals(""))
+            {
+                var textBoxRange = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[0];
+                textBoxRange.Text = messagesTxRange[selectedSignal];
+                var textBoxScale = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[1];
+                var textBoxOffset = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[2];
+                textBoxScale.Text = messagesTxScale[selectedSignal];
+                textBoxOffset.Text = messagesTxOffset[selectedSignal];
+            }
+
+        }
+
+
+        private void drpDwnNetworkBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var dd = (sender as ComboBox);
+            string sItem = (string)dd.SelectedItem;
+            if (sItem != null && !sItem.Trim().Equals(""))
+            {
+                var grd = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[1];
+                var grdR = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[2];
+                var drpDwnSignal = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[3];
+                var textBoxRange = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[0];
+                var textBoxScale = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[1];
+                var textBoxOffset = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[2];
+                var textBoxReceptionTime = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<TextBox>().ToList()[3];
+                List<String> lvaluesTx = new List<String>();
+                List<String> lvaluesRx = new List<String>();
+
+
+
+
+
+                selectedNode = sItem;
+                txMessageWithFrameId.TryGetValue(sItem, out lvaluesTx);
+                if (lvaluesTx != null && lvaluesTx.Count > 0)
+                {
+                    grd.ItemsSource = (lvaluesTx).ToList();
+                    List<String> lvaluesSignal = new List<String>();
+                    messagesTxSignal.TryGetValue(lvaluesTx[0].Substring(0, lvaluesTx[0].IndexOf("(")), out lvaluesSignal);
+                    if (lvaluesSignal != null && lvaluesSignal.Count > 0)
+                    {
+                        selectedSignal = lvaluesSignal[0];
+                        selectedTxMessage = lvaluesTx[0].Substring(0, lvaluesTx[0].IndexOf("("));
+                        drpDwnSignal.ItemsSource = (lvaluesSignal).ToList();
+                        textBoxRange.Text = messagesTxRange[selectedSignal];
+                        textBoxScale.Text = messagesTxScale[selectedSignal];
+                        textBoxOffset.Text = messagesTxOffset[selectedSignal];
+                    }
+                    else
+                    {
+                        selectedTxMessage = "";
+                        lvaluesSignal = new List<String>();
+                        drpDwnSignal.ItemsSource = (lvaluesSignal).ToList();
+                        selectedSignal = "";
+                        textBoxRange.Text = "";
+                        textBoxScale.Text = "";
+                        textBoxOffset.Text = "";
+                    }
+                }
+                else
+                {
+                    lvaluesTx = new List<String>();
+                    grd.ItemsSource = (lvaluesTx).ToList();
+                    List<String> lvaluesSignal = new List<String>();
+                    drpDwnSignal.ItemsSource = (lvaluesSignal).ToList();
+                    selectedSignal = "";
+                    textBoxRange.Text = "";
+                    textBoxScale.Text = "";
+                    textBoxOffset.Text = "";
+                }
+
+
+
+
+                textBoxReceptionTime.Text = "";
+                rxMessageWithFrameId.TryGetValue(sItem, out lvaluesRx);
+                if (lvaluesRx != null && lvaluesRx.Count > 0)
+                {
+                    grdR.ItemsSource = (lvaluesRx).ToList();
+                    selectedRxMessage = lvaluesRx[0].Substring(0, lvaluesRx[0].IndexOf("("));
+                    if (rxReceptionTimeout.ContainsKey(selectedRxMessage))
+                    {
+                        textBoxReceptionTime.Text = rxReceptionTimeout[selectedRxMessage];
+                    }
+
+                }
+                else
+                {
+                    lvaluesRx = new List<String>();
+                    grdR.ItemsSource = (lvaluesRx).ToList();
+
+                }
+            }
+
+
+
+        }
+
+        private void drpDwnMailBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var dd = (sender as ComboBox);
+            var sItem = dd.SelectedItem;
+            selectedMailBox =(string) sItem;
+            var grd = SpForDynamicGrid.Children.OfType<Grid>().FirstOrDefault();
+
+            if (grd != null)
+            {
+                GetUpdatedValuesForConfigGeneration();
+                var currSelectedMailBox = grd.Children
+                                            .OfType<ComboBox>()
+                                            .Where(cb => cb.Name == dd.Name.ToString())
+                                            .FirstOrDefault();
+
+                var a1 = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(a => a.SHORTNAME == DockingManagerModelHelper.ModuleName).FirstOrDefault();
+                var a2 = a1.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Where(b => b.SUBCONTAINERS.Length > 1).FirstOrDefault();
+                var currentConfigParamChild = a2.SUBCONTAINERS.Where(c => c.SHORTNAME.Equals(currSelectedMailBox.SelectedValue.ToString(), StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
+
+                string strEnableControls = a2.SUBCONTAINERS.Where(c => c.SHORTNAME.Equals(currSelectedMailBox.SelectedValue.ToString(), StringComparison.OrdinalIgnoreCase)).Select(c => c.PARAMETERVALUES.VALUE.Value).FirstOrDefault();
+
+                // Enable/Disable the checkbox for the parent MailBox
+                var tlist = grd.Children.OfType<CheckBox>().ToList();
+                var currSelectedMailBoxCB = grd.Children
+                                            .OfType<CheckBox>()
+                                            .Where(cb => cb.Name == currSelectedMailBox.Name.ToString())
+                                            .FirstOrDefault();
+                if (currSelectedMailBoxCB != null)
+                {
+                    if (strEnableControls.Equals("ENABLE", StringComparison.OrdinalIgnoreCase))
+                        currSelectedMailBoxCB.IsChecked = true;
+                    else
+                        currSelectedMailBoxCB.IsChecked = false;
+                }
+
+                for (int i = 0; i < currentConfigParamChild.SUBCONTAINERS.Length; i++)
+                {
+                    var currentConfigParamName = currentConfigParamChild.SUBCONTAINERS[i].PARAMETERVALUES.DEFINITIONREF.Value;
+                    var currentConfigParamValue = currentConfigParamChild.SUBCONTAINERS[i].PARAMETERVALUES.VALUE.Value;
+                }
+
+                if (currSelectedMailBox == null)
+                {
+                    // This config property was not rendered before. Choose the 1st item as default
+                }
+                else
+                {
+                    //Below loop will is used to change the values of the controls based on the dropdown selection.
+                    foreach (var child in grd.Children)
+                    {
+                        switch (child.GetType().Name.ToLower())
+                        {
+                            case "textblock":
+                                var c1 = child as System.Windows.Controls.TextBlock;
+                                if (c1.Name.Equals(currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c1.Name, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault(), StringComparison.OrdinalIgnoreCase))
+                                    c1.Text = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c1.Name, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.Value).FirstOrDefault();
+                                break;
+                            case "textbox":
+                                var c2 = child as System.Windows.Controls.TextBox;
+                                string str = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c2.Name.Substring(0, c2.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                if (c2.Name.Equals(str + "_Val", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    c2.Text = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(str, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.VALUE.Value).FirstOrDefault();
+                                    if (strEnableControls.Equals("ENABLE", StringComparison.OrdinalIgnoreCase))
+                                        c2.IsEnabled = true;
+                                    else
+                                        c2.IsEnabled = false;
+                                }
+
+                                break;
+                            case "checkbox":
+                                var c3 = child as System.Windows.Controls.CheckBox;
+                                string strCB = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c3.Name.Substring(0, c3.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                if (c3.Name.Equals(strCB + "_Val", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    c3.IsChecked = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(strCB, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.VALUE.Value).FirstOrDefault().ToString().Equals("ENABLE") ? true : false;
+                                    if (strEnableControls.Equals("ENABLE", StringComparison.OrdinalIgnoreCase))
+                                        c3.IsEnabled = true;
+                                    else
+                                        c3.IsEnabled = false;
+                                }
+                                break;
+                            case "combobox":
+                                var c4 = child as System.Windows.Controls.ComboBox;
+                                string strCmb = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c4.Name.Substring(0, c4.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                if (c4.Name.Equals(strCmb + "_Val", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    c4.SelectedValue = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(strCmb, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.VALUE.Value).FirstOrDefault();
+                                    if (strEnableControls.Equals("ENABLE", StringComparison.OrdinalIgnoreCase))
+                                        c4.IsEnabled = true;
+                                    else
+                                        c4.IsEnabled = false;
+                                }
+                                break;
+                        }
+                    }
+                }
+                DoCanIf();
+            }
+            DockingManagerModelHelper.SelectedMailBox = sItem.ToString();
+
+        }
+
+        /// <summary>
+        /// To get the full path of the TreeViewItemAdv
+        /// </summary>
+        public string GetFullPath(TreeViewItemAdv node)
+        {
+            if (node == null)
+                throw new ArgumentNullException();
+
+            var result = Convert.ToString(node.Header);
+
+            for (var i = GetParentItem(node); i != null; i = GetParentItem(i))
+                result = i.Header + "\\" + result;
+
+            return result;
+        }
+
+        /// <summary>
+        /// To get the parent of the item
+        /// </summary>
+        static TreeViewItemAdv GetParentItem(TreeViewItemAdv item)
+        {
+            for (var i = VisualTreeHelper.GetParent(item); i != null; i = VisualTreeHelper.GetParent(i))
+                if (i is TreeViewItemAdv)
+                    return (TreeViewItemAdv)i;
+
+            return null;
+        }
+
+        #endregion
+
+        #region Implementation
+        /// <summary>
+        /// Called when [loaded].
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            CurrentVisualStyle = "Metro";
+        }
+
+        /// <summary>
+        /// On Visual Style Changed.
+        /// </summary>
+        /// <remarks></remarks>
+        private void OnVisualStyleChanged()
+        {
+            VisualStyles visualStyle = VisualStyles.Default;
+            Enum.TryParse(CurrentVisualStyle, out visualStyle);
+            if (visualStyle != VisualStyles.Default)
+            {
+                SfSkinManager.ApplyStylesOnApplication = true;
+                SfSkinManager.SetVisualStyle(this, visualStyle);
+                SfSkinManager.ApplyStylesOnApplication = false;
+            }
+        }
+
+        /// <summary>
+        /// Menu item click 
+        /// </summary>
+        /// <param name="item"></param>
+        private void OnMenuItemClick(MenuItem item)
+        {
+            MenuItem parent = item.Parent as MenuItem;
+            foreach (MenuItem menuItem in parent.Items)
+            {
+                menuItem.IsChecked = false;
+            }
+            item.IsChecked = true;
+        }
+
+        /// <summary>
+        /// Set the active window
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+		private void OnActivateWindow(object sender, RoutedEventArgs e)
+        {
+            string name = (sender as MenuItem).Tag as string;
+            DockingManager.ActivateWindow(name);
+        }
+
+        /// <summary>
+        /// Initialize the windows forms host
+        /// </summary>
+        private void InitWindowsFormsHost()
+        {
+            if (DockingManager.UseInteropCompatibilityMode)
+            {
+                WindowsFormsHost host = new WindowsFormsHost();
+                WinForms.Button btn = new WinForms.Button();
+                btn.Text = "Winows Forms Button";
+                host.Child = btn;
+                // FindResults.Content = host;
+                WindowsFormsHost.EnableWindowsFormsInterop();
+            }
+        }
+
+        /// <summary>
+        /// Ckear the events
+        /// </summary>
+        private void OnClear(object sender, EventArgs args)
+        {
+            Log.Text = "";
+        }
+
+        /// <summary>
+        /// Events
+        /// </summary>
+        private void SubscribeForEvents()
+        {
+            //Subscribe the AutoHideAnimationStart property changed event
+            DockingManager.AutoHideAnimationStart += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the AutoHideAnimationStop property changed event
+            DockingManager.AutoHideAnimationStop += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the WindowActivated property changed event
+            DockingManager.WindowActivated += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the WindowDeactivated property changed event
+            DockingManager.WindowDeactivated += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the WindowDragStart property changed event
+            DockingManager.WindowDragStart += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the WindowDragEnd property changed event
+            DockingManager.WindowDragEnd += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the ActiveWindow property changed event
+            DockingManager.ActiveWindowChanged += new PropertyChangedCallback(OnPropertyChanged);
+        }
+
+        #endregion
+
+        #region Events
+        /// <summary>
+        /// Routed event raising
+        /// </summary>
+        private void OnEventRaising(object sender, RoutedEventArgs e)
+        {
+            FrameworkElement element = e.OriginalSource as FrameworkElement;
+            string name = element != null ? element.Name : string.Empty;
+            Log.TextWrapping = TextWrapping.Wrap;
+            Log.Text = Log.Text + e.RoutedEvent.Name + " : " + name + "\n";
+            Scroll.ScrollToBottom();
+
+        }
+
+        /// <summary>
+        /// Property changed event raising
+        /// </summary>
+		private void OnPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            string name = e.NewValue != null ? (e.NewValue as FrameworkElement).Name : string.Empty;
+            Log.TextWrapping = TextWrapping.Wrap;
+            Log.Text = Log.Text + e.Property.Name + " : " + name + "\n";
+            Scroll.ScrollToBottom();
+        }
+
+        #endregion
+
+        bool m_layoutflag = true;
+        private void DockingManager_LayoutUpdated(object sender, EventArgs e)
+        {
+            if (m_layoutflag)
+            {
+                // SfSkinManager.SetVisualStyle(this, VisualStyles.Metro);
+                m_layoutflag = false;
+            }
+        }
+
+        /// <summary>
+        /// Handles the CloseAllTabs event of the DockingManager control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="Syncfusion.Windows.Tools.Controls.CloseTabEventArgs"/> instance containing the event data.</param>
+        private void DockingManager_CloseAllTabs(object sender, CloseTabEventArgs e)
+        {
+            string closingtabs = "";
+            MessageBoxResult result = MessageBox.Show("Do you want to close the tabs? ", "Closing Tabs", MessageBoxButton.YesNo);
+            if (result == MessageBoxResult.Yes)
+            {
+                for (int i = 0; i < e.ClosingTabItems.Count; i++)
+                {
+                    TabItemExt tabitem = e.ClosingTabItems[i] as TabItemExt;
+                    if (tabitem.Content != null && (tabitem.Content as ContentPresenter) != null)
+                    {
+                        ContentPresenter presenter = tabitem.Content as ContentPresenter;
+                        if (presenter != null && presenter.Content != null)
+                        {
+                            closingtabs = closingtabs + "\n\t" + DockingManager.GetHeader(presenter.Content as DependencyObject);
+                        }
+                    }
+                }
+                Log.TextWrapping = TextWrapping.Wrap;
+                Log.Text = Log.Text + "Closed Tabs" + " : " + closingtabs + "\n";
+                Scroll.ScrollToBottom();
+            }
+            else if (result == MessageBoxResult.No)
+            {
+                e.Cancel = true;
+            }
+        }
+
+        /// <summary>
+        /// Handles the CloseOtherTabs event of the DockingManager control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="Syncfusion.Windows.Tools.Controls.CloseTabEventArgs"/> instance containing the event data.</param>
+        private void DockingManager_CloseOtherTabs(object sender, CloseTabEventArgs e)
+        {
+            string closingtabs = "";
+            MessageBoxResult result = MessageBox.Show("Do you want to close the tabs? ", "Closing Tabs", MessageBoxButton.YesNo);
+            if (result == MessageBoxResult.Yes)
+            {
+                for (int i = 0; i < e.ClosingTabItems.Count; i++)
+                {
+                    TabItemExt tabitem = e.ClosingTabItems[i] as TabItemExt;
+                    if (tabitem.Content != null && (tabitem.Content as ContentPresenter) != null)
+                    {
+                        ContentPresenter presenter = tabitem.Content as ContentPresenter;
+                        if (presenter != null && presenter.Content != null)
+                        {
+                            closingtabs = closingtabs + "\n\t" + DockingManager.GetHeader(presenter.Content as DependencyObject);
+                        }
+                    }
+                }
+                Log.TextWrapping = TextWrapping.Wrap;
+                Log.Text = Log.Text + "Closed Tabs" + " : " + closingtabs + "\n";
+                Scroll.ScrollToBottom();
+            }
+            else if (result == MessageBoxResult.No)
+            {
+                e.Cancel = true;
+            }
+        }
+
+        private void DockingManager_IsSelectedDocument(FrameworkElement sender, IsSelectedChangedEventArgs e)
+        {
+            if (DockingManager.DocContainer != null && SfSkinManager.GetVisualStyle(this) != SfSkinManager.GetVisualStyle(DockingManager.DocContainer as DependencyObject))
+            {
+                SfSkinManager.SetVisualStyle(DockingManager.DocContainer as DependencyObject, SfSkinManager.GetVisualStyle(this));
+            }
+        }
+        private void btnAddMoreButton_Clicked(object sender, RoutedEventArgs e)
+        {
+            if(selectedMailCanIf!=null&&  selectedMailCanIf.Equals("CANIF_TxBasicCANMailbox"))
+            {
+                isChanged = false;
+                var drMailTx = SpForDynamicGrid.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[7];
+                //selectMailBoxMessage = (string)drMailTx.SelectedItem;
+                if (selectMailBoxMessage != null&&!selectMailBoxMessage.Trim().Equals(""))
+                {
+                    if (mailBoxMessage != null && !mailBoxMessage.ContainsKey(selectedMailBox))
+                    {
+                        mailBoxMessage[selectedMailBox] = selectMailBoxMessage;
+                        List<String> onlyTx = new List<string>();
+                        foreach (KeyValuePair<string, string> kvp in messagesTxFrameIds)
+                        {
+                            if (!mailBoxMessage[selectedMailBox].Equals(kvp.Key))
+                            {
+                                onlyTx.Add(kvp.Key);
+                            }
+
+                        }
+                        drMailTx.ItemsSource = onlyTx;
+
+                        if (onlyTx.Count > 0)
+                        {
+                            drMailTx.SelectedIndex = 0;
+                        }
+                    }
+                    else
+                    {
+
+                        List<String> l1 = new List<string>();
+                        if (mailBoxMessageMore.ContainsKey(selectedMailBox))
+                        {
+                            mailBoxMessageMore.TryGetValue(selectedMailBox, out l1);
+
+                        }
+                        l1.Add(selectMailBoxMessage);
+                        mailBoxMessageMore[selectedMailBox] = l1;
+
+
+                        List<String> onlyTx = new List<string>();
+                        foreach (KeyValuePair<string, string> kvp in messagesTxFrameIds)
+                        {
+                            if (!l1.Contains(kvp.Key) && !mailBoxMessage[selectedMailBox].Equals(kvp.Key))
+                            {
+                                onlyTx.Add(kvp.Key);
+                            }
+
+                        }
+                        drMailTx.ItemsSource = onlyTx;
+
+                        if (onlyTx.Count > 0)
+                        {
+                            drMailTx.SelectedIndex = 0;
+                        }
+
+
+
+
+
+
+
+                    }
+                    var drMailTxFrame = SpForDynamicGrid.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[6];
+                    selectMailBoxFrameId = (string)drMailTxFrame.SelectedItem;
+                    if (mailBoxFrameId != null && !mailBoxFrameId.ContainsKey(selectedMailBox))
+                    {
+                        mailBoxFrameId[selectedMailBox] = selectMailBoxMessage;
+                        List<String> onlyTxFame = new List<string>();
+                        foreach (KeyValuePair<string, string> kvp in messagesTxFrameIds)
+                        {
+                            if (!mailBoxFrameId[selectedMailBox].Equals(kvp.Value))
+                            {
+                                onlyTxFame.Add(kvp.Value);
+                            }
+
+                        }
+                        drMailTxFrame.ItemsSource = onlyTxFame;
+                        if (onlyTxFame.Count > 0)
+                        {
+                            drMailTxFrame.SelectedIndex = 0;
+                        }
+                    }
+                    else
+                    {
+
+                        List<String> l1 = new List<string>();
+                        if (mailBoxFrameIdMore.ContainsKey(selectedMailBox))
+                        {
+                            mailBoxFrameIdMore.TryGetValue(selectedMailBox, out l1);
+
+
+                        }
+                        l1.Add(selectMailBoxFrameId);
+                        mailBoxFrameIdMore[selectedMailBox] = l1;
+
+
+
+                        List<String> onlyTxFame = new List<string>();
+                        foreach (KeyValuePair<string, string> kvp in messagesTxFrameIds)
+                        {
+                            if (!l1.Contains(kvp.Value) && !mailBoxFrameId[selectedMailBox].Equals(kvp.Value))
+                            {
+                                onlyTxFame.Add(kvp.Value);
+                            }
+
+                        }
+                        drMailTxFrame.ItemsSource = onlyTxFame;
+                        if (onlyTxFame.Count > 0)
+                        {
+                            drMailTxFrame.SelectedIndex = 0;
+                        }
+
+                    }
+                    if (mailBoxDLCMore != null)
+                    {
+                        List<String> l1 = new List<string>();
+                        if (mailBoxDLCMore.ContainsKey(selectedMailBox))
+                        {
+                            mailBoxDLCMore.TryGetValue(selectedMailBox, out l1);
+
+
+                        }
+                        l1.Add(selectMailBoxDLC);
+                        mailBoxDLCMore[selectedMailBox] = l1;
+
+                    }
+
+                    if (mailBoxMaskValueMore != null)
+                    {
+                        List<String> l1 = new List<string>();
+                        if (mailBoxMaskValueMore.ContainsKey(selectedMailBox))
+                        {
+                            mailBoxMaskValueMore.TryGetValue(selectedMailBox, out l1);
+
+
+                        }
+                        l1.Add(selectMailBoxMaskValue);
+                        mailBoxMaskValueMore[selectedMailBox] = l1;
+                    }
+                }
+
+            }
+               
+
+        }
+            private void OpenBtn_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            Serializer ser = new Serializer();
+            string stringFile = string.Empty;
+            string FileExt = string.Empty;
+            string DirPath = string.Empty;
+
+            if (Directory.GetCurrentDirectory().Contains("bin"))
+            {
+                DirPath = Directory.GetCurrentDirectory().Substring(0, Directory.GetCurrentDirectory().IndexOf("\\bin"));
+            }
+            else
+            {
+                DirPath = Directory.GetCurrentDirectory();
+            }
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                stringFile = File.ReadAllText(openFileDialog.FileName);
+                FileExt = Path.GetExtension(openFileDialog.FileName);
+            }
+            if (FileExt.Equals(".arxml", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    DockingManagerModelHelper.Configuration = ser.Deserialize<AUTOSAR>(stringFile);
+                    DockingManagerModelHelper.ProjectName = DockingManagerModelHelper.Configuration.ARPACKAGES[0].ELEMENTS.ECUCMODULECONFIGURATIONVALUES.DEFINITIONREF.Value;
+                    File.WriteAllText(DockingManagerModelHelper.TargetInputFolderPath + "\\DefaultConfig.arxml", stringFile);
+                    PopulateWorkspaceExplorer();
+                    CreateDynamicWPFGridForModule();
+
+                    MessageBox.Show(openFileDialog.FileName + " Loaded Successfully.");
+                }
+                catch (Exception)
+                {
+                    MessageBox.Show("Invalid ARXML format....Please select an ARXML file with defined format.");
+                }
+            }
+            else if (FileExt.Equals(".dbc", StringComparison.OrdinalIgnoreCase))
+            {
+                File.WriteAllText(DockingManagerModelHelper.TargetInputFolderPath + "\\Sample_DB.dbc", stringFile);
+                MessageBox.Show(openFileDialog.FileName + " Loaded Successfully.");
+            }
+            else if (FileExt.Equals(".h", StringComparison.OrdinalIgnoreCase))
+            {
+                File.WriteAllText(DockingManagerModelHelper.TargetInputFolderPath + "\\CAN_Driver_cfg.h", stringFile);
+                MessageBox.Show(openFileDialog.FileName + " Loaded Successfully.");
+            }
+            else
+            {
+                MessageBox.Show("Only files having extension .ARXML, .DBC and .h files can be opened.");
+            }
+        }
+
+        private void GenerateCanMgrBtn_Click(object sender, RoutedEventArgs e)
+        {
+            String Message = "Output Files Generated and Saved Successfully at following path : " + DockingManagerModelHelper.TargetOutputFolderPath;
+            if (isManual)
+            {
+                rxmReceptionTimeout = rxReceptionTimeout;
+            }
+            else
+            {
+                rxmReceptionTimeout = rxReceptionTimeoutDefault;
+            }
+            genHeaderFile();
+            genCFile(fnamec);
+            MessageBox.Show(Message);
+
+
+        }
+        private void genCFile(String fname)
+        {
+            using (StreamWriter outputFile = new StreamWriter(Path.Combine(DockingManagerModelHelper.TargetOutputFolderPath, "CanMgr_cfg.c")))
+            {
+                outputFile.WriteLine("/*");
+                outputFile.WriteLine("* CanMgr_cfg.c");
+                outputFile.WriteLine("*");
+                outputFile.WriteLine("*  Created on:" + DateTime.Now.ToString("d-M-yyyy"));
+                outputFile.WriteLine("*      Author: " + Environment.MachineName);
+                outputFile.WriteLine("*/");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("#include \"CanMgr_cfg.h\"");
+                outputFile.WriteLine("#include \"CanMgr.h\"");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("#define EINVAL 22");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+
+                List<String> txMsg = null;
+                if (txMessage.ContainsKey(selectedNode))
+                {
+                    txMsg = txMessage[selectedNode];
+                }
+                int txMsgCount = 0;
+                if (txMsg != null && txMsg.Count > 0)
+                {
+                    foreach (String msg in txMsg)
+                    {
+                        txMsgCount++;
+                        outputFile.WriteLine("/**");
+                        outputFile.WriteLine("* Signals in message " + msg + ".");
+                        outputFile.WriteLine("*");
+                        outputFile.WriteLine("* All signal values are as on the CAN bus.");
+                        outputFile.WriteLine("*/");
+                        outputFile.WriteLine("");
+                        outputFile.WriteLine("");
+                        outputFile.WriteLine("struct " + fname + "_" + msg + "_t {");
+                        if (messagesTxSignal.ContainsKey(msg))
+                        {
+                            List<String> signalsTx = messagesTxSignal[msg];
+                            if (signalsTx != null && signalsTx.Count > 0)
+                            {
+                                foreach (string sig in signalsTx)
+                                {
+                                    outputFile.WriteLine("uint8_t " + sig + ";");
+                                }
+
+
+                            }
+
+                        }
+                        outputFile.WriteLine("}" + msg + ";");
+                        outputFile.WriteLine("");
+
+
+
+
+
+
+
+                    }
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    foreach (String msg in txMsg)
+                    {
+                        outputFile.WriteLine("const " + fnamec + "_" + msg + "_t default_" + msg + " = {0,1,2,1,0,0};");
+                    }
+
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("uint8_t Init_data_value[CAN_MGR_MAX_NO_OF_TX_MSGS][8];");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("void CanMgr_cfgInit(void)");
+                    outputFile.WriteLine("{");
+                    int i = 0;
+                    int j = 0;
+                    foreach (String msg in txMsg)
+                    {
+                        if (messagesTxSignal.ContainsKey(msg))
+                        {
+                            List<String> signalsTx = messagesTxSignal[msg];
+                            if (signalsTx != null && signalsTx.Count > 0)
+                            {
+
+                                foreach (string sig in signalsTx)
+                                {
+                                    outputFile.WriteLine(fname + "_" + sig + "_pack(&Init_data_value[" + i + "][" + j + "], &" + sig + ", " + sig + "_LENGTH);");
+
+
+                                    i++;
+                                    if (i % 8 == 0)
+                                    {
+                                        i = 0;
+                                        j++;
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+
+                    outputFile.WriteLine("}");
+                    outputFile.WriteLine("CanMgr_TxInfoTable_t CanMgr_TxInfoTable[CAN_MGR_MAX_NO_OF_TX_MSGS] = {");
+                    outputFile.WriteLine("      {");
+                    outputFile.WriteLine("          " + txMsg[0] + "_TX_METHOD , ");
+                    outputFile.WriteLine("          " + txMsg[0] + "_CLC_TIME,");
+                    outputFile.WriteLine("          " + txMsg[0] + "_LENGTH,");
+                    outputFile.WriteLine("          " + "0");
+                    outputFile.WriteLine("      " + "}");
+                    for (int index = 1; index < txMsg.Count; index++)
+                    {
+                        outputFile.WriteLine("      ,");
+                        outputFile.WriteLine("      {");
+                        outputFile.WriteLine("          " + txMsg[index] + "_TX_METHOD , ");
+                        outputFile.WriteLine("          " + txMsg[index] + "_CLC_TIME,");
+                        outputFile.WriteLine("          " + txMsg[index] + "_LENGTH,");
+                        outputFile.WriteLine("          0");
+                        outputFile.WriteLine("          }");
+
+                    }
+                    outputFile.WriteLine("};");
+
+
+
+
+                }
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+
+                List<String> rxMsg = null;
+                if (rxMessage.ContainsKey(selectedNode))
+                {
+                    rxMsg = rxMessage[selectedNode];
+                }
+
+                if (rxMsg != null && rxMsg.Count > 0)
+                {
+                    outputFile.WriteLine("CanMgr_RxInfoTable_t CanMgr_RxInfoTable[CAM_MGR_MAX_NO_OF_RX_MSGS] = {");
+                    outputFile.WriteLine("      {");
+                    outputFile.WriteLine("          " + rxMsg[0] + "_RX_METHOD , ");
+                    outputFile.WriteLine("          " + rxMsg[0] + "_LENGTH,");
+                    outputFile.WriteLine("          " + (rxReceptionTimeout.ContainsKey(rxMsg[0]) ? rxReceptionTimeout[rxMsg[0]] : "0") + ",");
+                    outputFile.WriteLine("          0");
+                    outputFile.WriteLine("          }");
+                    for (int index = 0; index < rxMsg.Count; index++)
+                    {
+                        outputFile.WriteLine("      ,");
+                        outputFile.WriteLine("      {");
+                        outputFile.WriteLine("          " + rxMsg[index] + "_RX_METHOD , ");
+                        outputFile.WriteLine("          " + rxMsg[index] + "_LENGTH,");
+                        outputFile.WriteLine("          " + (rxReceptionTimeout.ContainsKey(rxMsg[index]) ? rxReceptionTimeout[rxMsg[index]] : "0") + ",");
+                        outputFile.WriteLine("          0");
+                        outputFile.WriteLine("          }");
+                    }
+                    outputFile.WriteLine("};");
+
+                }
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                if (txMsg != null && txMsg.Count > 0)
+                {
+                    if (selectedType.Equals("Transmission"))
+                    {
+                        foreach (String msg in txMsg)
+                        {
+                            outputFile.WriteLine("/**");
+                            outputFile.WriteLine("* Pack message " + msg + ".");
+                            outputFile.WriteLine("*");
+                            outputFile.WriteLine("* @param[out] dst_p Buffer to pack the message into.");
+                            outputFile.WriteLine("* @param[in] src_p Data to pack.");
+                            outputFile.WriteLine("* @param[in] size Size of dst_p.");
+                            outputFile.WriteLine("*");
+                            outputFile.WriteLine("* @return Size of packed data, or negative error code.");
+                            outputFile.WriteLine("*/");
+                            outputFile.WriteLine("int " + fname + "_" + msg + "_pack(");
+                            outputFile.WriteLine("      uint8_t *dst_p,");
+                            outputFile.WriteLine("      const struct " + fname + "_" + msg + "_t *src_p,");
+                            outputFile.WriteLine("      size_t size);");
+                            outputFile.WriteLine("");
+                            outputFile.WriteLine("");
+                            outputFile.WriteLine("");
+                        }
+
+                    }
+                    if (selectedType.Equals("Receiver"))
+                    {
+                        foreach (String msg in txMsg)
+                        {
+                            outputFile.WriteLine("/**");
+                            outputFile.WriteLine("* Unpack message " + msg + ".");
+                            outputFile.WriteLine("*");
+                            outputFile.WriteLine("* @param[out] dst_p Object to unpack the message into.");
+                            outputFile.WriteLine("* @param[in] src_p Message to unpack.");
+                            outputFile.WriteLine("* @param[in] size Size of src_p.");
+                            outputFile.WriteLine("*");
+                            outputFile.WriteLine("* @return zero(0) or negative error code.");
+                            outputFile.WriteLine("*/");
+                            outputFile.WriteLine("int " + fname + "_" + msg + "_unpack(");
+                            outputFile.WriteLine("      struct " + fname + "_" + msg + "_t *dst_p,");
+                            outputFile.WriteLine("      const uint8_t *src_p,");
+                            outputFile.WriteLine("      size_t size);");
+                            outputFile.WriteLine("");
+                            outputFile.WriteLine("");
+                            outputFile.WriteLine("");
+                        }
+                    }
+                    if (selectedType.Equals("Transmission"))
+                    {
+                        outputFile.WriteLine("/**");
+                        outputFile.WriteLine("*");
+                        outputFile.WriteLine("* @param[in] value Signal to encode.");
+                        outputFile.WriteLine("*");
+                        outputFile.WriteLine("* @return Encoded signal.");
+                        outputFile.WriteLine("*/");
+                        foreach (String msg in txMsg)
+                        {
+                            if (messagesTxSignal.ContainsKey(msg))
+                            {
+                                List<String> msgSignals = messagesTxSignal[msg];
+                                if (msgSignals != null && msgSignals.Count > 0)
+                                {
+                                    foreach (String sig in msgSignals)
+                                    {
+                                        outputFile.WriteLine("uint8_t " + fname + "_" + msg + "_" + sig + "_encode(double value);");
+
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (selectedType.Equals("Receiver"))
+                    {
+                        outputFile.WriteLine("");
+                        outputFile.WriteLine("");
+                        outputFile.WriteLine("");
+                        outputFile.WriteLine("/**");
+                        outputFile.WriteLine("* Decode given signal by applying scaling and offset.");
+                        outputFile.WriteLine("*");
+                        outputFile.WriteLine("* @param[in] value Signal to decode.");
+                        outputFile.WriteLine("*");
+                        outputFile.WriteLine("* @return Decoded signal.");
+                        outputFile.WriteLine("*/");
+                        foreach (String msg in txMsg)
+                        {
+                            if (messagesTxSignal.ContainsKey(msg))
+                            {
+                                List<String> msgSignals = messagesTxSignal[msg];
+                                if (msgSignals != null && msgSignals.Count > 0)
+                                {
+                                    foreach (String sig in msgSignals)
+                                    {
+                                        outputFile.WriteLine("double " + fname + "_" + msg + "_" + sig + "_decode(uint8_t value);");
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                    if (selectedType.Equals("Transmission"))
+                    {
+                        outputFile.WriteLine("");
+                        outputFile.WriteLine("");
+                        outputFile.WriteLine("");
+                        outputFile.WriteLine("/**");
+                        outputFile.WriteLine("* Check that given signal is in allowed range.");
+                        outputFile.WriteLine("*");
+                        outputFile.WriteLine("* @param[in] value Signal to check.");
+                        outputFile.WriteLine("*");
+                        outputFile.WriteLine("@return true if in range, false otherwise.");
+                        outputFile.WriteLine("*/");
+                        foreach (String msg in txMsg)
+                        {
+                            if (messagesTxSignal.ContainsKey(msg))
+                            {
+                                List<String> msgSignals = messagesTxSignal[msg];
+                                if (msgSignals != null && msgSignals.Count > 0)
+                                {
+                                    foreach (String sig in msgSignals)
+                                    {
+                                        outputFile.WriteLine("bool " + fname + "_" + msg + "_" + sig + "_is_in_range(uint8_t value);");
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("static inline uint8_t pack_left_shift_u8(");
+                    outputFile.WriteLine("      uint8_t value,");
+                    outputFile.WriteLine("      uint8_t shift,");
+                    outputFile.WriteLine("      uint8_t mask)");
+                    outputFile.WriteLine("{");
+                    outputFile.WriteLine("      return (uint8_t)((uint8_t)(value << shift) & mask);");
+                    outputFile.WriteLine("}");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("static inline uint8_t pack_left_shift_u16(");
+                    outputFile.WriteLine("      uint16_t value,");
+                    outputFile.WriteLine("      uint8_t shift,");
+                    outputFile.WriteLine("      uint8_t mask)");
+                    outputFile.WriteLine("{");
+                    outputFile.WriteLine("      return (uint8_t)((uint8_t)(value << shift) & mask);");
+                    outputFile.WriteLine("}");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("static inline uint8_t pack_right_shift_u16(");
+                    outputFile.WriteLine("      uint16_t value,");
+                    outputFile.WriteLine("      uint8_t shift,");
+                    outputFile.WriteLine("      uint8_t mask)");
+                    outputFile.WriteLine("{");
+                    outputFile.WriteLine("      return (uint8_t)((uint8_t)(value >> shift) & mask);");
+                    outputFile.WriteLine("}");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("static inline uint16_t unpack_left_shift_u16(");
+                    outputFile.WriteLine("      uint8_t value,");
+                    outputFile.WriteLine("      uint8_t shift,");
+                    outputFile.WriteLine("      uint8_t mask)");
+                    outputFile.WriteLine("{");
+                    outputFile.WriteLine("      return (uint16_t)((uint16_t)(value & mask) << shift);");
+                    outputFile.WriteLine("}");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("static inline uint8_t unpack_right_shift_u8(");
+                    outputFile.WriteLine("      uint8_t value,");
+                    outputFile.WriteLine("      uint8_t shift,");
+                    outputFile.WriteLine("      uint8_t mask)");
+                    outputFile.WriteLine("{");
+                    outputFile.WriteLine("      return (uint8_t)((uint8_t)(value & mask) >> shift);");
+                    outputFile.WriteLine("}");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("static inline uint16_t unpack_right_shift_u16(");
+                    outputFile.WriteLine("      uint8_t value,");
+                    outputFile.WriteLine("      uint8_t shift,");
+                    outputFile.WriteLine("      uint8_t mask)");
+                    outputFile.WriteLine("{");
+                    outputFile.WriteLine("      return (uint16_t)((uint16_t)(value & mask) >> shift);");
+                    outputFile.WriteLine("}");
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    if (selectedType.Equals("Transmission"))
+                    {
+                        foreach (String msg in txMsg)
+                        {
+                            outputFile.WriteLine("int " + fname + "_" + msg + "_pack(");
+                            outputFile.WriteLine("      uint8_t *dst_p,");
+                            outputFile.WriteLine("      const struct " + fname + "_" + msg + "_t *src_p,");
+                            outputFile.WriteLine("      size_t size)");
+                            outputFile.WriteLine("{");
+                            outputFile.WriteLine("      if (size < 4u) {");
+                            outputFile.WriteLine("          return (-EINVAL);");
+                            outputFile.WriteLine("      }");
+                            outputFile.WriteLine("      memset(&dst_p[0], 0, 4);");
+                            outputFile.WriteLine("");
+
+                            if (messagesTxSignal.ContainsKey(msg))
+                            {
+                                List<String> msgSignals = messagesTxSignal[msg];
+                                if (msgSignals != null && msgSignals.Count > 0)
+                                {
+                                    int index = 0;
+                                    foreach (String sig in msgSignals)
+                                    {
+                                        outputFile.WriteLine("dst_p[" + index + "] |= pack_left_shift_u8(src_p->" + sig + ", 6u, 0xc0u);");
+                                        index++;
+                                    }
+                                    outputFile.WriteLine("      return (" + msgSignals.Count + ");");
+                                }
+                                else
+                                {
+                                    outputFile.WriteLine("      return (0);");
+                                }
+                            }
+                            else
+                            {
+                                outputFile.WriteLine("      return (0);");
+                            }
+                            outputFile.WriteLine("}");
+                            outputFile.WriteLine("");
+                        }
+                    }
+                    if (selectedType.Equals("Receiver"))
+                    {
+                        foreach (String msg in txMsg)
+                        {
+                            outputFile.WriteLine("");
+                            outputFile.WriteLine("int " + fname + "_" + msg + "_unpack(");
+                            outputFile.WriteLine("      struct " + fname + "_" + msg + "_t *dst_p,");
+                            outputFile.WriteLine("      const uint8_t *src_p,");
+                            outputFile.WriteLine("      size_t size)");
+                            outputFile.WriteLine("{");
+                            outputFile.WriteLine("      if (size < 4u) {");
+                            outputFile.WriteLine("          return (-EINVAL);");
+                            outputFile.WriteLine("      }");
+                            outputFile.WriteLine("      memset(dst_p, 0, sizeof(*dst_p));");
+                            outputFile.WriteLine("");
+
+                            if (messagesTxSignal.ContainsKey(msg))
+                            {
+                                List<String> msgSignals = messagesTxSignal[msg];
+                                if (msgSignals != null && msgSignals.Count > 0)
+                                {
+                                    int index = 0;
+                                    foreach (String sig in msgSignals)
+                                    {
+                                        outputFile.WriteLine("dst_p->" + sig + " |= unpack_right_shift_u8(src_p[" + index + "], 6u, 0xc0u);");
+                                        index++;
+                                    }
+                                    outputFile.WriteLine("      return (0);");
+                                }
+                                else
+                                {
+                                    outputFile.WriteLine("      return (0);");
+                                }
+                            }
+                            else
+                            {
+                                outputFile.WriteLine("      return (0);");
+                            }
+                            outputFile.WriteLine("}");
+                            outputFile.WriteLine("");
+                        }
+                    }
+                    outputFile.WriteLine("");
+                    if (selectedType.Equals("Transmission"))
+                    {
+                        foreach (String msg in txMsg)
+                        {
+                            outputFile.WriteLine("");
+                            if (messagesTxSignal.ContainsKey(msg))
+                            {
+                                List<String> msgSignals = messagesTxSignal[msg];
+                                if (msgSignals != null && msgSignals.Count > 0)
+                                {
+
+                                    foreach (String sig in msgSignals)
+                                    {
+                                        outputFile.WriteLine("uint8_t " + fname + "_" + msg + "_" + sig + "_encode(double value)");
+                                        outputFile.WriteLine("{");
+                                        outputFile.WriteLine("  return (uint8_t)(value);");
+                                        outputFile.WriteLine("}");
+                                        outputFile.WriteLine("");
+                                        outputFile.WriteLine("");
+                                        outputFile.WriteLine("double " + fname + "_" + msg + "_" + sig + "_decode(uint8_t value)");
+                                        outputFile.WriteLine("{");
+                                        outputFile.WriteLine("  return ((double)value);");
+                                        outputFile.WriteLine("}");
+
+                                        outputFile.WriteLine("");
+                                        outputFile.WriteLine("");
+                                        outputFile.WriteLine("bool " + fname + "_" + msg + "_" + sig + "_is_in_range(uint8_t value)");
+                                        outputFile.WriteLine("{");
+                                        outputFile.WriteLine("  return (value <= 3u);");
+                                        outputFile.WriteLine("}");
+                                        outputFile.WriteLine("");
+                                        outputFile.WriteLine("");
+                                    }
+
+                                }
+                            }
+                        }
+
+                    }
+
+
+
+
+
+                    outputFile.WriteLine("");
+                    outputFile.WriteLine("");
+                    foreach (String msg in txMsg)
+                    {
+                        if (messagesTxSignal.ContainsKey(msg))
+                        {
+                            List<String> msgSignals = messagesTxSignal[msg];
+                            if (msgSignals != null && msgSignals.Count > 0)
+                            {
+                                if (selectedType.Equals("Transmission"))
+                                {
+                                    foreach (String sig in msgSignals)
+                                    {
+                                        outputFile.WriteLine("uint8_t Can_Mgr_Write_" + sig + "(uint8_t data)");
+                                        outputFile.WriteLine("{");
+                                        outputFile.WriteLine("  uint8_t ret;");
+                                        outputFile.WriteLine("  uint8_t temp;");
+                                        outputFile.WriteLine("  temp = " + fname + "_" + msg + "_" + sig + "_is_in_range(data);");
+                                        outputFile.WriteLine("  if(temp == 1)");
+                                        outputFile.WriteLine("  {");
+                                        outputFile.WriteLine("      " + msg + "." + sig + " = " + fname + "_" + sig + "_" + sig + "_encode(data);");
+                                        outputFile.WriteLine("      (void)" + fname + "_" + msg + "_pack(fl_data,&" + msg + "," + msg + "_LENGTH);");
+                                        outputFile.WriteLine("      ret = CanMgr_SendSignal(CAN_MGR_" + msg + ",fl_data);");
+                                        outputFile.WriteLine("  }");
+                                        outputFile.WriteLine("  else");
+                                        outputFile.WriteLine("  {");
+                                        outputFile.WriteLine("      ret = E_NOT_OK;");
+                                        outputFile.WriteLine("  }");
+                                        outputFile.WriteLine("  return ret;");
+                                        outputFile.WriteLine("}");
+                                        outputFile.WriteLine("");
+                                        outputFile.WriteLine("");
+                                    }
+                                }
+                                outputFile.WriteLine("");
+                                outputFile.WriteLine("");
+                                if (selectedType.Equals("Receiver"))
+                                {
+                                    foreach (String sig in msgSignals)
+                                    {
+                                        outputFile.WriteLine("uint8_t Can_Mgr_Read_" + sig + "(uint8_t* data)");
+                                        outputFile.WriteLine("{");
+                                        outputFile.WriteLine("  uint8_t fl_data[" + msg + "_LENGTH];");
+                                        outputFile.WriteLine("  uint8_t ret;");
+                                        outputFile.WriteLine("  ret = Can_Mgr_ReceiveSignal(CAN_MGR_" + msg + ",fl_data);");
+                                        outputFile.WriteLine("  " + fname + "_" + msg + "_unpack(&" + msg + ",fl_data," + msg + "_LENGTH);");
+                                        outputFile.WriteLine("  *data =(uint8_t)" + msg + "." + sig + ";");
+                                        outputFile.WriteLine("  return ret;");
+                                        outputFile.WriteLine("}");
+                                    }
+                                }
+                                outputFile.WriteLine("");
+                                outputFile.WriteLine("");
+                                if (selectedType.Equals("Transmission"))
+                                {
+                                    foreach (String sig in msgSignals)
+                                    {
+                                        outputFile.WriteLine("uint8_t Can_Mgr_" + sig + "_cbk(void)");
+                                        outputFile.WriteLine("{");
+                                        outputFile.WriteLine("  return (CanMgr_GetTransmissionStatus(CAN_MGR_" + msg + "));");
+                                        outputFile.WriteLine("}");
+                                        outputFile.WriteLine("");
+
+                                    }
+                                }
+                            }
+                        }
+
+
+                    }
+
+
+
+                }
+
+
+
+            }
+        }
+        private void genHeaderFile()
+        {
+            using (StreamWriter outputFile = new StreamWriter(Path.Combine(DockingManagerModelHelper.TargetOutputFolderPath, "CanMgr_cfg.h")))
+            {
+                outputFile.WriteLine("/*");
+                outputFile.WriteLine("* CanMgr_cfg.h");
+                outputFile.WriteLine("*");
+                outputFile.WriteLine("*  Created on:" + DateTime.Now.ToString("d-M-yyyy"));
+                outputFile.WriteLine("*      Author: " + Environment.MachineName);
+                outputFile.WriteLine("*/");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("#ifndef CANMGR_CFG_H_");
+                outputFile.WriteLine("#define CANMGR_CFG_H_");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("#include " + "\"CanMgr_Types.h\"");
+                outputFile.WriteLine("#include \"hal_stdtypes.h\"");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("#define INIT_DATA_VALUE    &Init_data_value");
+                outputFile.WriteLine("#define CAN_MGR_MAINFUNCTION_PERIOD        0x0Au");
+                outputFile.WriteLine("");
+                List<String> txMsg = null;
+                if (txMessage.ContainsKey(selectedNode))
+                {
+                    txMsg = txMessage[selectedNode];
+                }
+                int txMsgCount = 0;
+                if (txMsg != null && txMsg.Count > 0)
+                {
+                    foreach (String msg in txMsg)
+                    {
+                        outputFile.WriteLine("#define CAN_MGR_" + msg + " " + txMsgCount + "u");
+                        txMsgCount++;
+                    }
+                }
+                outputFile.WriteLine("#define CAN_MGR_MAX_NO_OF_TX_MSGS " + txMsgCount + "u");
+                outputFile.WriteLine("");
+                List<String> rxMsg = null;
+                if (rxMessage.ContainsKey(selectedNode))
+                {
+                    rxMsg = rxMessage[selectedNode];
+                }
+                int rxMsgCount = 0;
+                if (rxMsg != null && rxMsg.Count > 0)
+                {
+                    foreach (String msg in rxMsg)
+                    {
+                        outputFile.WriteLine("#define CAN_MGR_" + msg + " " + rxMsgCount + "u");
+                        rxMsgCount++;
+                    }
+                }
+                outputFile.WriteLine("#define CAM_MGR_MAX_NO_OF_RX_MSGS " + rxMsgCount + "u");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("/* Frame ids. */");
+                if (txMsg != null && txMsg.Count > 0)
+                {
+                    foreach (String msg in txMsg)
+                    {
+                        outputFile.WriteLine("#define " + msg + "_FRAME_ID  " + messagesTxFrameIds[msg]);
+                    }
+                }
+                outputFile.WriteLine("");
+                if (rxMsg != null && rxMsg.Count > 0)
+                {
+                    foreach (String msg in rxMsg)
+                    {
+                        outputFile.WriteLine("#define " + msg + "_FRAME_ID  " + messagesRxFrameIds[msg]);
+                    }
+                }
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("/* Frame lengths in bytes. */");
+                if (txMsg != null && txMsg.Count > 0)
+                {
+                    foreach (String msg in txMsg)
+                    {
+                        outputFile.WriteLine("#define " + msg + "_LENGTH  (" + (messagesTxDLC.ContainsKey(msg) ? messagesTxDLC[msg] : "0") + "u)");
+                    }
+                }
+                outputFile.WriteLine("");
+                outputFile.WriteLine("/* Tx CLC Time. */");
+                if (txMsg != null && txMsg.Count > 0)
+                {
+                    foreach (String msg in txMsg)
+                    {
+                        outputFile.WriteLine("#define " + msg + "_CLC_TIME  (" + (messagesTxCycleTime.ContainsKey(msg) ? messagesTxCycleTime[msg] : "0") + "u)");
+                    }
+                }
+                outputFile.WriteLine("");
+                if (rxMsg != null && rxMsg.Count > 0)
+                {
+                    foreach (String msg in rxMsg)
+                    {
+                        outputFile.WriteLine("#define " + msg + "_LENGTH  (" + (messagesRxDLC.ContainsKey(msg) ? messagesRxDLC[msg] : "0") + "u)");
+                    }
+                }
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("/* Extended or standard frame types.. */");
+                if (txMsg != null && txMsg.Count > 0)
+                {
+                    foreach (String msg in txMsg)
+                    {
+                        outputFile.WriteLine("#define " + msg + "_IS_EXTENDED  (0)");
+                    }
+                }
+                outputFile.WriteLine("");
+                if (rxMsg != null && rxMsg.Count > 0)
+                {
+                    foreach (String msg in rxMsg)
+                    {
+                        outputFile.WriteLine("#define " + msg + "_IS_EXTENDED  (0)");
+                    }
+                }
+                outputFile.WriteLine("");
+                outputFile.WriteLine("/* Methods. */");
+
+                if (txMsg != null && txMsg.Count > 0)
+                {
+                    foreach (String msg in txMsg)
+                    {
+                        String tm = "-1u";
+                        if (messagesTxMethod.ContainsKey(msg))
+                        {
+                            String tms = messagesTxMethod[msg];
+                            if (tms.Equals("Cyclic"))
+                            {
+                                tm = "0u";
+                            }
+                            else if (tms.Equals("Event"))
+                            {
+                                tm = "1u";
+
+                            }
+                            else if (tms.Equals("Combined"))
+                            {
+                                tm = "2u";
+
+                            }
+
+                        }
+                        outputFile.WriteLine("#define " + msg + "_TX_METHOD  " + (tm));
+                    }
+                }
+                if (rxMsg != null && rxMsg.Count > 0)
+                {
+                    foreach (String msg in rxMsg)
+                    {
+                        String rm = "-1u";
+                        if (messagesRxMethod.ContainsKey(msg))
+                        {
+                            String rms = messagesRxMethod[msg];
+                            if (rm.Equals("Cyclic"))
+                            {
+                                rm = "0u";
+                            }
+                            else if (rm.Equals("Event"))
+                            {
+                                rm = "1u";
+
+                            }
+                            else if (rm.Equals("Combined"))
+                            {
+                                rm = "2u";
+
+                            }
+
+                        }
+                        outputFile.WriteLine("#define " + msg + "_RX_METHOD  " + (rm));
+                    }
+                }
+
+
+                outputFile.WriteLine("");
+                outputFile.WriteLine("extern uint8_t Init_data_value[CAN_MGR_MAX_NO_OF_TX_MSGS][8];");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("typedef struct");
+                outputFile.WriteLine("{");
+                outputFile.WriteLine("   uint8_t  frame_type;");
+                outputFile.WriteLine("  uint16_t period;");
+                outputFile.WriteLine("  uint8_t  length;");
+                outputFile.WriteLine("  uint16_t counter;");
+                outputFile.WriteLine("}CanMgr_TxInfoTable_t;");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("typedef struct");
+                outputFile.WriteLine("{");
+                outputFile.WriteLine("   uint8_t frame_type;");
+                outputFile.WriteLine("   uint8_t length;");
+                outputFile.WriteLine("  uint16_t timeout;");
+                outputFile.WriteLine("  uint16_t timeout_counter;");
+                outputFile.WriteLine("}CanMgr_RxInfoTable_t;");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("extern CanMgr_TxInfoTable_t CanMgr_TxInfoTable[CAN_MGR_MAX_NO_OF_TX_MSGS];");
+                outputFile.WriteLine("extern CanMgr_RxInfoTable_t CanMgr_RxInfoTable[CAM_MGR_MAX_NO_OF_RX_MSGS];");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("void CanMgr_cfgInit(void);");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("/*The following functions shall be used by the application to write the signal which are to be transmitted*/");
+                if (txMsg != null && txMsg.Count > 0)
+                {
+                    foreach (String msg in txMsg)
+                    {
+                        List<String> txSignals = messagesTxSignal[msg];
+                        if (txSignals != null && txSignals.Count > 0)
+                        {
+                            if (selectedType.Equals("Transmission"))
+                            {
+                                foreach (String sig in txSignals)
+                                {
+                                    outputFile.WriteLine("uint8_t Can_Mgr_Write_" + sig + "(uint8_t data);");
+                                }
+                                outputFile.WriteLine("");
+                                outputFile.WriteLine("");
+                                foreach (String sig in txSignals)
+                                {
+                                    outputFile.WriteLine("uint8_t Can_Mgr_" + sig + "_cbk(void);");
+                                }
+                            }
+                            if (selectedType.Equals("Receiver"))
+                            {
+                                outputFile.WriteLine("");
+                                outputFile.WriteLine("");
+                                outputFile.WriteLine("/*The following functions shall be used by the application to read the received signal*/");
+                                foreach (String sig in txSignals)
+                                {
+                                    outputFile.WriteLine("uint8_t Can_Mgr_Read_" + sig + "(uint8_t* data);");
+                                }
+                            }
+
+
+                        }
+                    }
+
+                }
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("#endif /* CANMGR_CFG_H_ */");
+
+
+
+
+
+            }
+
+        }
+        private void GenerateBtnCanIf_Click(object sender, RoutedEventArgs e)
+        {
+            geneRateCanIfHeader();
+            geneRateCanIfC();
+
+        }
+        private void geneRateCanIfHeader()
+        {
+            using (StreamWriter outputFile = new StreamWriter(Path.Combine(DockingManagerModelHelper.TargetOutputFolderPath, "CanIF_cfg.h")))
+            {
+
+                outputFile.WriteLine("#include <stdlib.h>");
+
+            }
+        }
+
+        private void geneRateCanIfC()
+        {
+            using (StreamWriter outputFile = new StreamWriter(Path.Combine(DockingManagerModelHelper.TargetOutputFolderPath, "CanIF_cfg.c")))
+            {
+
+                outputFile.WriteLine("/**********************************************************************************************************************");
+                outputFile.WriteLine("CanIf_MailBoxConfig");
+                outputFile.WriteLine("**********************************************************************************************************************/");
+                outputFile.WriteLine("/** ");
+                outputFile.WriteLine("\\var    CanIf_MailBoxConfig");
+                outputFile.WriteLine("\\brief  Mailbox table.");
+                outputFile.WriteLine("\\details");
+                outputFile.WriteLine(" Element                 Description");
+                outputFile.WriteLine(" CtrlStatesIdx           the index of the 1:1 relation pointing to CanIf_CtrlStates");
+                outputFile.WriteLine("PduIdFirst              \"First\" PDU mapped to mailbox.");
+                outputFile.WriteLine(" PduIdLast               \"Last\" PDU mapped to mailbox.");
+                outputFile.WriteLine("TxBufferCfgIdx          the index of the 0:1 relation pointing to CanIf_TxBufferPrioByCanIdByteQueueConfig");
+                outputFile.WriteLine("TxBufferHandlingType");
+                outputFile.WriteLine("MailBoxType             Type of mailbox: Rx-/Tx- BasicCAN/FullCAN/unused.");
+                outputFile.WriteLine("*/ ");
+                int canBasicTx = -1;
+                outputFile.WriteLine("const CanIf_MailBoxConfigType CanIf_MailBoxConfig[CANIF_TOTAL_NUM_OF_MAIL_BOX] = {");
+                outputFile.WriteLine("   /* Index    CtrlStatesIdx            PduIdFirst                           PduIdLast                     TxBufferCfgIdx                             TxBufferHandlingType                     MailBoxType      */         ");
+                outputFile.Write("  {      0           0UL  ,         0U  /* Unused, TxPduId 2 */ ,        0U  /* Unused, TxPduId 2 */ , "+(mailBoxCanif.ContainsKey(lstMailConfigParentsMailBox[0])&& mailBoxCanif[lstMailConfigParentsMailBox[0]].Equals("CANIF_TxBasicCANMailbox")?(++canBasicTx+ ",CANIF_TXBUFFER_HANDLINGTYPE_PRIOBYCANID, CANIF_TxBasicCANMailbox }" ) : "CANIF_NO_TXBUFFERCFGIDXOFMAILBOXCONFIG, CANIF_TXBUFFER_HANDLINGTYPE_NONE, "+ (mailBoxCanif.ContainsKey(lstMailConfigParentsMailBox[0])? mailBoxCanif[lstMailConfigParentsMailBox[0]]: "CANIF_RxBasicCANMailbox"))+"}");
+                for(int index=1;index< lstMailConfigParentsMailBox.Count;index++)
+                {
+                    outputFile.WriteLine(",");
+                    outputFile.Write("  {      "+index+"           0UL  ,         0U  /* Unused, TxPduId 2 */ ,        0U  /* Unused, TxPduId 2 */ , " + (mailBoxCanif.ContainsKey(lstMailConfigParentsMailBox[index]) && mailBoxCanif[lstMailConfigParentsMailBox[index]].Equals("CANIF_TxBasicCANMailbox") ? (++canBasicTx+"UL" + ",CANIF_TXBUFFER_HANDLINGTYPE_PRIOBYCANID, CANIF_TxBasicCANMailbox }") : "CANIF_NO_TXBUFFERCFGIDXOFMAILBOXCONFIG, CANIF_TXBUFFER_HANDLINGTYPE_NONE, " + (mailBoxCanif.ContainsKey(lstMailConfigParentsMailBox[index]) ? mailBoxCanif[lstMailConfigParentsMailBox[index]] : "CANIF_RxBasicCANMailbox"))+"}");
+                }
+                outputFile.WriteLine("");
+                outputFile.WriteLine("};");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("#ifdef CANIF_BASIC_CAN");
+                outputFile.WriteLine("/**********************************************************************************************************************");
+                outputFile.WriteLine("CanIf_MappedTxBuffersConfig");
+                outputFile.WriteLine("**********************************************************************************************************************/");
+                outputFile.WriteLine("/** ");
+                outputFile.WriteLine("  \\var    CanIf_MappedTxBuffersConfig");
+                outputFile.WriteLine("  \\brief  Mapped Tx-buffer(s)");
+                outputFile.WriteLine("  \\details");
+                outputFile.WriteLine("  Element             Description");
+                outputFile.WriteLine("  MailBoxConfigIdx    the index of the 1:1 relation pointing to CanIf_MailBoxConfig");
+                outputFile.WriteLine("*/ ");
+                outputFile.WriteLine("const CanIf_MappedTxBuffersConfigType CanIf_MappedTxBuffersConfig[CANIF_TOTAL_NUM_OF_MAILBOX_CONIGURED_TO_STORE_TX_BUFFERS] = {");
+                outputFile.WriteLine("      /* Index    MailBoxConfigIdx */     ");
+                int lindex = -1;
+                for(int index=0;index< lstMailConfigParentsMailBox.Count;index++)
+                {
+                    if(mailBoxCanif.ContainsKey(lstMailConfigParentsMailBox[index]))
+                    {
+                        string value = mailBoxCanif[lstMailConfigParentsMailBox[index]];
+                        if(value!=null&&!value.Trim().Equals("")&& value.Trim().Equals("CANIF_TxBasicCANMailbox"))
+                        {
+                            lindex++;
+                            if (index!= lstMailConfigParentsMailBox.Count-1)
+                            {
+                                outputFile.WriteLine("      "+lindex+","+(index-1)+"UL"+"   },");
+                            }
+                            else
+                            {
+                                outputFile.WriteLine("      " + lindex + "," + (index - 1) + "UL" + "   }");
+                            }
+                        }
+
+                    }
+                }
+                outputFile.WriteLine("};");
+                outputFile.WriteLine("#endif");
+                outputFile.WriteLine("/**********************************************************************************************************************");
+                outputFile.WriteLine("  CanIf_RxIndicationFctList");
+                outputFile.WriteLine("**********************************************************************************************************************/");
+                outputFile.WriteLine("/** ");
+                outputFile.WriteLine("  \\var    CanIf_RxIndicationFctList");
+                outputFile.WriteLine("  \\brief  Rx indication functions table.");
+                outputFile.WriteLine("  \\details");
+                outputFile.WriteLine("  Element               Description");
+                outputFile.WriteLine("  RxIndicationFct       Rx indication function.");
+                outputFile.WriteLine("  RxIndicationLayout    Layout of Rx indication function.");
+                outputFile.WriteLine("*/");
+                outputFile.WriteLine("const CanIf_RxPduConfigType CanIf_RxPduConfig[CANIF_TOTAL_RX_PDU] = {");
+                outputFile.WriteLine("      /* Index    RxPduCanId     RxPduMask     UpperPduId  ");
+                for(int index=0;index< lstMailConfigParentsMailBox.Count;index++)
+                {
+                    string canid = mailBoxFrameId.ContainsKey(lstMailConfigParentsMailBox[index]) ? mailBoxFrameId[lstMailConfigParentsMailBox[index]] : "0x0000";
+                    string maskValue = mailBoxMaskValue.ContainsKey(lstMailConfigParentsMailBox[index]) ? mailBoxMaskValue[lstMailConfigParentsMailBox[index]] : "0x0000";
+                    string dlc = mailBoxDLC.ContainsKey(lstMailConfigParentsMailBox[index]) ? mailBoxDLC[lstMailConfigParentsMailBox[index]]+"U" : "0U";
+                    string upperPduId = "" + index;
+                    if (index != lstMailConfigParentsMailBox.Count - 1)
+                    {
+                        outputFile.WriteLine("{      "+index+",    "+canid+" ,  "+maskValue+"     , "+index+"                                                                         ,  "+dlc+",                    3UL  /* PduR_CanIfRxIndication */  }, ");
+                    }
+                    else
+                    {
+                        outputFile.WriteLine("      " + lindex + "," + (index - 1) + "UL" + "   }");
+                    }
+                }
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+                outputFile.WriteLine("");
+
+
+            }
+        }
+
+        private void GenerateBtn_Click(object sender, RoutedEventArgs e)
+        {
+            bool isCantoolsConfigGenerated = false;
+            bool isConfigGenerated = false;
+            string Message = string.Empty;
+            if (!File.Exists(DockingManagerModelHelper.TargetInputFolderPath + "\\CAN_Driver_cfg.h"))
+            {
+                isConfigGenerated = false;
+                //MessageBox.Show("Please Upload Corresponding Config.h file for the uploaded ARXML file at following location..." + DockingManagerModelHelper.TargetInputFolderPath);
+            }
+            else
+            {
+                GetUpdatedValuesForConfigGeneration();
+                DockingManagerModelHelper.UpdateARXML();
+                DockingManagerModelHelper.GenerateConfigFile();
+                isConfigGenerated = true;
+            }
+            if (File.Exists(DockingManagerModelHelper.TargetInputFolderPath + "\\Sample_DB.dbc"))
+            {
+                DockingManagerModelHelper.GenerateCantoolsConfigurations();
+                isCantoolsConfigGenerated = true;
+            }
+            else
+            {
+                isCantoolsConfigGenerated = false;
+                //MessageBox.Show("Please Upload .DBC file to Generate Cantools Config Files at following location..." + DockingManagerModelHelper.TargetInputFolderPath);
+            }
+
+            if (isCantoolsConfigGenerated && isConfigGenerated)
+            {
+                Message = "Output Files Generated and Saved Successfully at following path : " + DockingManagerModelHelper.TargetOutputFolderPath;
+            }
+            else if (isConfigGenerated && !isCantoolsConfigGenerated)
+            {
+                Message = "1) Config File Generated Successfully at Following Location..." + DockingManagerModelHelper.TargetInputFolderPath + Environment.NewLine + Environment.NewLine
+                    + "2) Cantools Confing Could not be Generated, Please Upload .DBC file to Generate Cantools Config Files at following location..." + DockingManagerModelHelper.TargetInputFolderPath;
+            }
+            else if (!isConfigGenerated && isCantoolsConfigGenerated)
+            {
+                Message = "1) Config file Could not be generated, Please upload corresponding config.h file for the uploaded ARXML file at following location..." + DockingManagerModelHelper.TargetInputFolderPath + Environment.NewLine + Environment.NewLine
+                   + "2) Cantools confing files generated at following location..." + DockingManagerModelHelper.TargetInputFolderPath;
+            }
+            else if (!isConfigGenerated && !isCantoolsConfigGenerated)
+            {
+                Message = "Output files not generated... Please check and upload corresponding Config.H and .DBC Files at following location..." + DockingManagerModelHelper.TargetInputFolderPath;
+            }
+            MessageBox.Show(Message);
+        }
+
+        private void ValidateBtn_Click(object sender, RoutedEventArgs e)
+        {
+            // For now, we are not doing any extra validation
+            // All validations are done real time, during the user input itself.
+            // Just return success. Everyone is happy :)
+            MessageBox.Show("Validation of user entered values successful");
+        }
+
+        private List<string> GetValuesFromArxml(AUTOSAR objAutoSAR, string modulename, string node)
+        {
+            var currentmodule = objAutoSAR.ARPACKAGES.Where(x => x.SHORTNAME.ToString().ToLower().Equals(modulename.ToLower())).FirstOrDefault();
+
+            var objSupportedValues = from Pkgs in currentmodule.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[0].SUBCONTAINERS
+                                     where Pkgs.SHORTNAME.Equals(node, StringComparison.OrdinalIgnoreCase)
+                                     select Pkgs.PARAMETERVALUES.SUPPORTEDVALUES.ToList();
+            var lst = objSupportedValues.ToList();
+
+            List<string> resultList = new List<string>();
+            if (lst.Count > 0)
+            {
+                foreach (string itm in lst[0])
+                {
+                    resultList.Add(Convert.ToString(itm));
+                }
+            }
+            return resultList;
+        }
+
+
+        private void wsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            var sItem = (sender as TreeViewAdv).SelectedItem as TreeViewItemAdv;
+
+            DockingManagerModelHelper.ModuleName = sItem.Header.ToString();
+
+            // Save the changes in the UI elements
+            var currentGrid = SpForDynamicGrid.Children.OfType<Grid>().Where(x => x.Name.ToLower() == DockingManagerModelHelper.ModuleName.ToLower()).FirstOrDefault();
+            var currPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => x.SHORTNAME.ToLower() == DockingManagerModelHelper.ModuleName.ToLower()).FirstOrDefault();
+
+            if ((currentGrid != null) && (currPackage != null))
+            {
+                // Get the config objects for this module
+                foreach (var child in currentGrid.Children)
+                {
+                    // The below if condition is needed to weed out Labels. They can't be updated
+                    if (!(child.GetType().FullName.Equals("System.Windows.Controls.TextBlock")))
+                    {
+                        string tempName = "";
+                        string tempValue = "";
+
+                        switch (child.GetType().Name.ToLower())
+                        {
+                            case "textbox":
+                                var c1 = child as System.Windows.Controls.TextBox;
+                                tempName = c1.Name.Remove(c1.Name.Length - 4);
+                                tempValue = c1.Text;
+                                break;
+                            case "checkbox":
+                                var c2 = child as System.Windows.Controls.CheckBox;
+                                tempName = c2.Name.Remove(c2.Name.Length - 4);
+                                tempValue = (bool)c2.IsChecked ? "ENABLE" : "DISABLE";
+                                break;
+                            case "combobox":
+                                var c3 = child as System.Windows.Controls.ComboBox;
+                                tempName = c3.Name.Remove(c3.Name.Length - 4);
+                                tempValue = c3.SelectedValue.ToString();
+                                break;
+                        }
+
+                        var currObj = currPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[0].SUBCONTAINERS
+                            .Where(x => ((x.PARAMETERVALUES != null) && (x.PARAMETERVALUES.DEFINITIONREF.Value == tempName))).FirstOrDefault();
+
+                        if (currObj != null)
+                            currObj.PARAMETERVALUES.VALUE.Value = tempValue;
+                    }
+                }
+            }
+
+            CreateDynamicWPFGridForModule();
+        }
+
+        private void GetUpdatedValuesForConfigGeneration()
+        {
+            Grid grd = SpForDynamicGrid.Children[0] as Grid;
+            string key = string.Empty;
+            for (int i = 0; i < grd.Children.Count; i++)
+            {
+                if (grd.Children[i].GetType() == typeof(TextBlock))
+                {
+                    key = (grd.Children[i] as TextBlock).Text;
+                }
+                if (i + 1 < grd.Children.Count && grd.Children[i + 1].GetType() == typeof(ComboBox))
+                {
+                    
+                  try
+                    {
+                        string value = (grd.Children[i + 1] as ComboBox).SelectedValue.ToString();
+                        UpdateObject(key, value);
+                    }
+                    catch(Exception e) { }
+                }
+                if (i + 1 < grd.Children.Count && grd.Children[i + 1].GetType() == typeof(TextBox))
+                {
+                    string value = (grd.Children[i + 1] as TextBox).Text.ToString();
+                    UpdateObject(key, value);
+                }
+                if (i + 1 < grd.Children.Count && grd.Children[i + 1].GetType() == typeof(CheckBox))
+                {
+                    string value = (bool)(grd.Children[i + 1] as CheckBox).IsChecked ? "ENABLE" : "DISABLE";
+                    UpdateObject(key, value);
+                }
+            }
+        }
+
+        public void UpdateObject(string key, string value)
+        {
+            bool isObjectFound = false;
+
+            var currentPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => String.Equals(x.SHORTNAME.ToString().ToLower(), DockingManagerModelHelper.ModuleName.ToLower())).FirstOrDefault();
+
+            for (int j = 0; j < currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Length; j++)
+            {
+                var currentConfigParamGrandParent = currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[j];
+                //TODO: Need to refine below code to accept only filtered object.
+                for (int k = 0; k < currentConfigParamGrandParent.SUBCONTAINERS.Length; k++)
+                {
+                    List<string> lstSupportedValues = new List<string>();
+                    string strControlType = string.Empty;
+                    var currentConfigParamParent = currentConfigParamGrandParent.SUBCONTAINERS[k];
+                    if (currentConfigParamParent.PARAMETERVALUES != null && currentConfigParamParent.PARAMETERVALUES.DEFINITIONREF.Value.Equals(key, StringComparison.OrdinalIgnoreCase))
+                    {
+                        currentConfigParamParent.PARAMETERVALUES.VALUE.Value = value;
+                        break;
+                    }
+
+
+                    // foreach (var currentConfigParamChild in currentConfigParamParent.SUBCONTAINERS)
+                    for (int i = 0; i < currentConfigParamParent.SUBCONTAINERS.Length; i++)
+                    {
+                        if (currentConfigParamParent.SUBCONTAINERS[i].PARAMETERVALUES.DEFINITIONREF.Value.Equals(key, StringComparison.OrdinalIgnoreCase))
+                        {
+                            currentConfigParamParent.SUBCONTAINERS[i].PARAMETERVALUES.VALUE.Value = value;
+                            isObjectFound = true;
+                            break;
+                        }
+                    }
+                    // if obj found, break out of all loops
+                    if (isObjectFound) break;
+                }
+                // if obj found, break out of all loops
+                if (isObjectFound) break;
+            }
+        }
+
+        public AUTOSARARPACKAGEELEMENTSECUCMODULECONFIGURATIONVALUESCONTAINERSECUCCONTAINERVALUEECUCCONTAINERVALUEECUCCONTAINERVALUE RetrieveConfigParamObject(string key)
+        {
+
+            bool isObjectFound = false;
+            AUTOSARARPACKAGEELEMENTSECUCMODULECONFIGURATIONVALUESCONTAINERSECUCCONTAINERVALUEECUCCONTAINERVALUEECUCCONTAINERVALUE obj = null;
+
+            var currentPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => String.Equals(x.SHORTNAME.ToString().ToLower(), DockingManagerModelHelper.ModuleName.ToLower())).FirstOrDefault();
+
+            for (int j = 0; j < currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Length; j++)
+            {
+                var currentConfigParamGrandParent = currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[j];
+
+                //TODO: Need to refine below code to accept only filtered object.
+                for (int k = 0; k < currentConfigParamGrandParent.SUBCONTAINERS.Length; k++)
+                {
+                    List<string> lstSupportedValues = new List<string>();
+                    string strControlType = string.Empty;
+                    var currentConfigParamParent = currentConfigParamGrandParent.SUBCONTAINERS[k];
+
+                    // foreach (var currentConfigParamChild in currentConfigParamParent.SUBCONTAINERS)
+                    for (int i = 0; i < currentConfigParamParent.SUBCONTAINERS.Length; i++)
+                    {
+                        if (currentConfigParamParent.SUBCONTAINERS[i].PARAMETERVALUES.DEFINITIONREF.name.Equals(key, StringComparison.OrdinalIgnoreCase))
+                        {
+                            obj = currentConfigParamParent.SUBCONTAINERS[i];
+                            isObjectFound = true;
+                            break;
+                        }
+                    }
+                    // if obj found, break out of all loops
+                    if (isObjectFound) break;
+                }
+                // if obj found, break out of all loops
+                if (isObjectFound) break;
+            }
+
+            return obj;
+        }
+
+        public AUTOSARARPACKAGEELEMENTSECUCMODULECONFIGURATIONVALUESCONTAINERSECUCCONTAINERVALUEECUCCONTAINERVALUE RetrieveConfigParamObjectParent(string key)
+        {
+
+            bool isObjectFound = false;
+            AUTOSARARPACKAGEELEMENTSECUCMODULECONFIGURATIONVALUESCONTAINERSECUCCONTAINERVALUEECUCCONTAINERVALUE obj = null;
+
+            var currentPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => String.Equals(x.SHORTNAME.ToString().ToLower(), DockingManagerModelHelper.ModuleName.ToLower())).FirstOrDefault();
+
+            for (int j = 0; j < currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Length; j++)
+            {
+                var currentConfigParamGrandParent = currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[j];
+
+                //TODO: Need to refine below code to accept only filtered object.
+                for (int k = 0; k < currentConfigParamGrandParent.SUBCONTAINERS.Length; k++)
+                {
+                    List<string> lstSupportedValues = new List<string>();
+                    string strControlType = string.Empty;
+                    var currentConfigParamParent = currentConfigParamGrandParent.SUBCONTAINERS[k];
+
+                    // foreach (var currentConfigParamChild in currentConfigParamParent.SUBCONTAINERS)
+                    for (int i = 0; i < currentConfigParamParent.SUBCONTAINERS.Length; i++)
+                    {
+                        if (currentConfigParamParent.SUBCONTAINERS[i].PARAMETERVALUES.DEFINITIONREF.name.Equals(key, StringComparison.OrdinalIgnoreCase))
+                        {
+                            obj = currentConfigParamParent;
+                            isObjectFound = true;
+                            break;
+                        }
+                    }
+                    // if obj found, break out of all loops
+                    if (isObjectFound) break;
+                }
+                // if obj found, break out of all loops
+                if (isObjectFound) break;
+            }
+
+            return obj;
+        }
+
+        private void SaveBtn_Click(object sender, RoutedEventArgs e)
+        {
+            GetUpdatedValuesForConfigGeneration();
+            DockingManagerModelHelper.UpdateARXML();
+            MessageBox.Show("ARXML Successfully saved at following path : " + DockingManagerModelHelper.TargetOutputFolderPath);
+        }
+
+        private void LoadDefaultConfigBtn_Click(object sender, RoutedEventArgs e)
+        {
+            DockingManagerModelHelper.Configuration = DockingManagerModelHelper.LoadARXML(true);
+            PopulateWorkspaceExplorer();
+            CreateDynamicWPFGridForModule();
+        }
+
+        private void LoadDBCBtn_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+
+            string stringFile = string.Empty;
+            string FileExt = string.Empty;
+
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                stringFile = File.ReadAllText(openFileDialog.FileName);
+                FileExt = Path.GetExtension(openFileDialog.FileName);
+
+            }
+
+            if (FileExt.Equals(".dbc", StringComparison.OrdinalIgnoreCase))
+            {
+                File.WriteAllText(DockingManagerModelHelper.TargetInputFolderPath + "\\" + Path.GetFileName(openFileDialog.FileName), stringFile);
+                CreateDynamicWPFGridForModuleStaticCan(Path.GetFileName(openFileDialog.FileName));
+                mailBoxCanif.Clear();
+                CreateDynamicWPFGridForModule();
+
+                MessageBox.Show(openFileDialog.FileName + " Loaded Successfully.");
+            }
+            else
+            {
+                MessageBox.Show("please eneter valid .dbc file.");
+            }
+
+        }
+    }
+}

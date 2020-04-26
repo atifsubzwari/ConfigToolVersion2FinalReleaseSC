@@ -1,0 +1,1494 @@
+﻿using ConfigGenerator.Helper;
+using ConfigGenerator.Helpers;
+using ConfigGenerator.Models;
+using Logger = ConfigGenerator.Logging;
+using Microsoft.Win32;
+using Syncfusion.SfSkinManager;
+using Syncfusion.Windows.Shared;
+using Syncfusion.Windows.Tools;
+using Syncfusion.Windows.Tools.Controls;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Forms.Integration;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using WinForms = System.Windows.Forms;
+using System.Web.Script.Serialization;
+
+namespace ConfigGenerator
+{
+    /// <summary>
+    /// Interaction logic for Docking.xaml
+    /// </summary>
+    public partial class DockingManagerWindow : Window
+    {
+
+        #region Class Fields
+
+        /// <summary>
+        /// Class Fields
+        /// </summary>
+
+        private string m_strStoragePath = string.Format(@"{0}\ConfigGenerator.", Environment.CurrentDirectory);
+        #endregion
+        #region Fields
+        private static string currentVisualStyle;
+        
+        #endregion
+
+        #region Properties
+        /// <summary>
+        /// Gets or sets the current visual style.
+        /// </summary>
+        /// <value></value>
+        /// <remarks></remarks>
+        public string CurrentVisualStyle
+        {
+            get
+            {
+                return currentVisualStyle;
+            }
+            set
+            {
+                currentVisualStyle = value;
+                OnVisualStyleChanged();
+            }
+        }
+        #endregion
+
+        #region Constructor
+        /// <summary>
+        /// Constructor for DockingManager.
+        /// </summary>
+        public DockingManagerWindow()
+        {
+
+            InitializeComponent();
+            DockingManager.ActiveWindow = Can;
+            InitWindowsFormsHost();
+            SubscribeForEvents();
+            this.Loaded += OnLoaded;
+
+            Logger.Log.Instance.Debug("Validating NLog");
+            Logger.Log.Instance.Info("Info Validating NLog");
+
+            try
+            {
+
+                DockingManagerModelHelper.Configuration = DockingManagerModelHelper.LoadARXML(false);
+                DockingManagerModelHelper.ProjectName = DockingManagerModelHelper.Configuration.ARPACKAGES[0].ELEMENTS.ECUCMODULECONFIGURATIONVALUES.DEFINITIONREF.Value;
+                DockingManagerModelHelper.ModuleName = DockingManagerModelHelper.Configuration.ARPACKAGES[0].SHORTNAME;
+
+                PopulateWorkspaceExplorer();
+                CreateDynamicWPFGridForModule();
+                CreateDynamicWPFGridForModuleStaticCan();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log.Instance.Error("Exception encountered with message: " + ex.Message);
+                throw ex;
+            }
+        }
+        #endregion
+
+        #region "Dynamic Loading of Controls"
+        private void PopulateWorkspaceExplorer()
+        {
+            String WorkspaceName = DockingManagerModelHelper.Configuration.ARPACKAGES[0].ELEMENTS.ECUCMODULECONFIGURATIONVALUES.DEFINITIONREF.Value.ToString().Trim('/').Split('/')[0];
+
+            if (String.IsNullOrEmpty(WorkspaceName))
+            {
+                // We dont even the have the root node. Some thing wrong with the ARXML
+                Logger.Log.Instance.Error("ARXML does not have even a single ARPACKAGE");
+                MessageBox.Show("ARXML does not have even a single ARPACKAGE. Check the input ARXML");
+                return;
+            }
+
+            // Let create the Tree which is just a holder for all the items and sub items
+            TreeViewAdv wsTreeView = new TreeViewAdv();
+            wsTreeView.SortingField = "Header";
+            wsTreeView.Sorting = SortDirection.Ascending;
+            wsTreeView.IsVirtualizing = true;
+            wsTreeView.VirtualizationMode = Syncfusion.Windows.Tools.VirtualizationMode.Normal;
+            wsTreeView.AnimationType = AnimationType.Fade;
+
+            wsTreeView.SelectedItemChanged += wsTreeView_SelectedItemChanged;
+
+            // Lets set the Workspace name
+            TreeViewItemAdv tviWorkspace = new TreeViewItemAdv() { Header = WorkspaceName.ToString() };
+            tviWorkspace.ExpandedImageSource = new BitmapImage(new Uri("/../Images/Folder_Expanded.png", UriKind.Relative));
+            tviWorkspace.CollapsedImageSource = new BitmapImage(new Uri("/../Images/Folder_Collapsed.png", UriKind.Relative));
+            tviWorkspace.IsExpanded = true;
+
+            foreach (var ArPkg in DockingManagerModelHelper.Configuration.ARPACKAGES)
+            {
+                string modulename = ArPkg.SHORTNAME.ToString();
+                TreeViewItemAdv tviModule = new TreeViewItemAdv() { Header = modulename };
+                tviModule.Name = modulename;
+                tviModule.LeftImageSource = new BitmapImage(new Uri("/../Images/" + modulename + "_MainModule_18px.png", UriKind.Relative));
+
+                tviWorkspace.Items.Add(tviModule);
+                Logger.Log.Instance.Info(String.Format("Added {0} module to the workspace view", modulename));
+            }
+
+            wsTreeView.Items.Add(tviWorkspace);
+
+            WorkspacesExplorer.Content = wsTreeView;
+        }
+
+        private void CreateDynamicWPFGridForModule()
+        {
+            string modulename = DockingManagerModelHelper.ModuleName;
+
+            var currentPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => String.Equals(x.SHORTNAME.ToString().ToLower(), modulename.ToLower())).FirstOrDefault();
+            bool isParentAdded = false;
+
+            if (modulename == DockingManagerModelHelper.ProjectName)
+            {
+                // User just clicked on the Project name. Ignore it
+                return;
+            }
+
+            if (currentPackage == null)
+            {
+                MessageBox.Show(modulename + " DOES NOT exist  in the input ARXML file", "Error - Module not found");
+                return;
+            }
+
+            // Clear any existing contents. This will help when we change modules
+            SpForDynamicGrid.Children.Clear();
+            
+            // Create the Grid
+            Grid DynamicGrid = new Grid();
+            DynamicGrid.Width = 930;
+            DynamicGrid.HorizontalAlignment = HorizontalAlignment.Left;
+            DynamicGrid.VerticalAlignment = VerticalAlignment.Top;
+            DynamicGrid.ShowGridLines = false;
+            DynamicGrid.Name = modulename;
+
+            // Create Columns
+            ColumnDefinition gridCol1 = new ColumnDefinition();
+            ColumnDefinition gridCol2 = new ColumnDefinition();
+            ColumnDefinition gridCol3 = new ColumnDefinition();
+            DynamicGrid.ColumnDefinitions.Add(gridCol1);
+            DynamicGrid.ColumnDefinitions.Add(gridCol2);
+            DynamicGrid.ColumnDefinitions.Add(gridCol3);
+
+            int startrow = 0;
+            int col = 0;
+            List<string> lstMailConfigParents = new List<string>();
+
+            for (int j = 0; j < currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Length; j++)
+            {
+                var currentConfigParamGrandParent = currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[j];
+                //TODO: Need to refine below code to accept only filtered object.
+                for (int k = 0; k < currentConfigParamGrandParent.SUBCONTAINERS.Length; k++)
+                {
+                    List<string> lstSupportedValues = new List<string>();
+                    string strControlType = string.Empty;
+                    var currentConfigParamParent = currentConfigParamGrandParent.SUBCONTAINERS[k];
+
+                    var areChildControlsEnabled = (currentConfigParamParent.PARAMETERVALUES == null) ? true : (currentConfigParamParent.PARAMETERVALUES.VALUE.Value.ToLower().Equals("enable") ? true : false);
+                    var ChildControlsEnabledName = currentConfigParamParent.PARAMETERVALUES != null ? currentConfigParamParent.PARAMETERVALUES.DEFINITIONREF.name : "";
+                    var ChildControlsEnabledText = currentConfigParamParent.PARAMETERVALUES != null ? currentConfigParamParent.PARAMETERVALUES.DEFINITIONREF.Value : "";
+                    bool isEnableDisableCheckBoxAdded = false;
+
+                    // foreach (var currentConfigParamChild in currentConfigParamParent.SUBCONTAINERS)
+                    for (int i = 0; i < currentConfigParamParent.SUBCONTAINERS.Length; i++)
+                    {
+                        var currentConfigParamChild = currentConfigParamParent.SUBCONTAINERS[i];
+                        var currentConfigParamName = currentConfigParamChild.PARAMETERVALUES.DEFINITIONREF.Value;
+                        var currentConfigParamValue = currentConfigParamChild.PARAMETERVALUES.VALUE.Value;
+                        var currentConfigParamID = currentConfigParamChild.PARAMETERVALUES.DEFINITIONREF.name;
+
+                        // Everytime let's starts a new row from column index 0 
+                        col = 0;
+
+                        if (!isParentAdded && currentConfigParamGrandParent.SUBCONTAINERS.Length > 1)
+                        {
+                            // Populate mailbox list
+                            lstMailConfigParents = currentConfigParamGrandParent.SUBCONTAINERS.Select(x => x.SHORTNAME).ToList();
+
+                            var currSelectedMailBox = SpForDynamicGrid.Children
+                                                        .OfType<ComboBox>()
+                                                        .Where(cb => cb.Name == currentConfigParamGrandParent.SHORTNAME + "_Val")
+                                                        .FirstOrDefault();
+
+                            RowDefinition gridRowMailbox = new RowDefinition();
+                            gridRowMailbox.Height = new GridLength(45);
+                            DynamicGrid.RowDefinitions.Add(gridRowMailbox);
+
+                            TextBlock lblMailBox = new TextBlock();
+                            lblMailBox.Text = currentConfigParamGrandParent.SHORTNAME;
+                            lblMailBox.Name = currentConfigParamGrandParent.SHORTNAME + "_LbL";
+                            lblMailBox.FontFamily = new FontFamily("Calibri");
+                            lblMailBox.FontSize = 14;
+                            lblMailBox.VerticalAlignment = VerticalAlignment.Center;
+                            lblMailBox.TextWrapping = TextWrapping.Wrap;
+                            lblMailBox.ToolTip = currentConfigParamGrandParent.BRIEF.Trim();
+                            Grid.SetRow(lblMailBox, startrow + i);
+                            Grid.SetColumn(lblMailBox, col);
+                            col++;
+                            DynamicGrid.Children.Add(lblMailBox);
+
+                            ComboBox drpDwnMailBox = new ComboBox();
+                            drpDwnMailBox.Name = currentConfigParamGrandParent.SHORTNAME + "_Val";
+                            drpDwnMailBox.FontSize = 12;
+                            drpDwnMailBox.FontWeight = FontWeights.Bold;
+                            drpDwnMailBox.Height = 30;
+                            drpDwnMailBox.Background = Brushes.White;
+                            drpDwnMailBox.IsSynchronizedWithCurrentItem = true;
+                            drpDwnMailBox.SelectedIndex = currSelectedMailBox == null ? 0 : currSelectedMailBox.SelectedIndex;
+                            drpDwnMailBox.SelectionChanged += drpDwnMailBox_SelectionChanged;
+                            Grid.SetRow(drpDwnMailBox, startrow + i);
+                            Grid.SetColumn(drpDwnMailBox, col);
+                            col++;
+                            drpDwnMailBox.ItemsSource = lstMailConfigParents;
+
+                            DynamicGrid.Children.Add(drpDwnMailBox);
+
+                            isParentAdded = true;
+                        }
+
+                        if (!isEnableDisableCheckBoxAdded)
+                        {
+                            RowDefinition gridRowCheckBox = new RowDefinition();
+                            gridRowCheckBox.Height = new GridLength(45);
+                            DynamicGrid.RowDefinitions.Add(gridRowCheckBox);
+                            col = 0;
+                            TextBlock lblChekBoxText = new TextBlock();
+                            lblChekBoxText.Text = ChildControlsEnabledName;
+                            lblChekBoxText.Name = ChildControlsEnabledName + "_Val";
+                            lblChekBoxText.FontFamily = new FontFamily("Calibri");
+                            lblChekBoxText.FontSize = 14;
+                            lblChekBoxText.VerticalAlignment = VerticalAlignment.Center;
+                            lblChekBoxText.TextWrapping = TextWrapping.Wrap;
+                            lblChekBoxText.ToolTip = currentConfigParamGrandParent.BRIEF.Trim();
+
+                            Grid.SetRow(lblChekBoxText, startrow + i + 1);
+                            Grid.SetColumn(lblChekBoxText, col);
+                            col++;
+                            DynamicGrid.Children.Add(lblChekBoxText);
+
+                            // Add the Checkbox to enable of disable this MailboxCtrl
+                            CheckBox chkBoxEnableDisable = new CheckBox();
+                            chkBoxEnableDisable.IsChecked = (currentConfigParamParent.PARAMETERVALUES == null) ? true : (currentConfigParamParent.PARAMETERVALUES.VALUE.Value.ToLower().Equals("enable") ? true : false);
+                            chkBoxEnableDisable.FontSize = 12;
+                            chkBoxEnableDisable.FontWeight = FontWeights.Bold;
+                            chkBoxEnableDisable.Height = 15;
+                            chkBoxEnableDisable.Margin = new Thickness(5, 0, 0, 0);
+                            chkBoxEnableDisable.Name = currentConfigParamGrandParent.SHORTNAME + "_Val";
+                            chkBoxEnableDisable.Background = Brushes.White;
+                            chkBoxEnableDisable.Click += MailboxCtrl_Clicked;
+                            Grid.SetRow(chkBoxEnableDisable, startrow + i + 1);
+                            Grid.SetColumn(chkBoxEnableDisable, col);
+
+                            Grid.SetColumn(chkBoxEnableDisable, col);
+                            col++;
+
+                            DynamicGrid.Children.Add(chkBoxEnableDisable);
+                            isEnableDisableCheckBoxAdded = true;
+
+                        }
+
+                        RowDefinition gridRow = new RowDefinition();
+                        gridRow.Height = new GridLength(45);
+                        DynamicGrid.RowDefinitions.Add(gridRow);
+
+                        TextBlock lbl = new TextBlock();
+
+                        // Everytime let's starts a new row from column index 0 
+                        col = 0;
+
+                        if (currentConfigParamChild.PARAMETERVALUES.SUPPORTEDVALUES.SUPPORTEDVALUE == null || currentConfigParamChild.PARAMETERVALUES.SUPPORTEDVALUES.SUPPORTEDVALUE.Length == 1)
+                        {
+                            strControlType = "Textbox";
+                        }
+                        else if (currentConfigParamChild.PARAMETERVALUES.SUPPORTEDVALUES.SUPPORTEDVALUE.Length > 1)
+                        {
+                            lstSupportedValues = currentConfigParamChild.PARAMETERVALUES.SUPPORTEDVALUES.SUPPORTEDVALUE.ToList();
+                            if (lstSupportedValues.Count > 0 && lstSupportedValues[0].Equals("Enable", StringComparison.OrdinalIgnoreCase))
+                            {
+                                strControlType = "Checkbox";
+                            }
+                            else
+                            {
+                                strControlType = "Combobox";
+                            }
+                        }
+
+                        lbl.Name = currentConfigParamID;
+                        lbl.Text = currentConfigParamName;
+                        lbl.FontFamily = new FontFamily("Calibri");
+                        lbl.FontSize = 14;
+                        lbl.VerticalAlignment = VerticalAlignment.Center;
+                        lbl.TextWrapping = TextWrapping.Wrap;
+                        lbl.ToolTip = currentConfigParamChild.BRIEF.Trim();
+                        if (isParentAdded)
+                        {
+                            Grid.SetRow(lbl, startrow + i + 2);
+                        }
+                        else
+                        {
+                            Grid.SetRow(lbl, startrow + i);
+                        }
+                        Grid.SetColumn(lbl, col);
+                        col++;
+                        DynamicGrid.Children.Add(lbl);
+
+                        switch (strControlType)
+                        {
+                            case "Combobox":
+                                ComboBox drpDwn = new ComboBox();
+                                drpDwn.FontSize = 12;
+                                drpDwn.FontWeight = FontWeights.Bold;
+                                drpDwn.Height = 30;
+                                drpDwn.Background = Brushes.White;
+                                drpDwn.IsEnabled = areChildControlsEnabled;
+                                drpDwn.Name = currentConfigParamID + "_Val";
+                                drpDwn.IsSynchronizedWithCurrentItem = true;
+                                if (isParentAdded)
+                                {
+                                    Grid.SetRow(drpDwn, startrow + i + 2);
+                                }
+                                else
+                                {
+                                    Grid.SetRow(drpDwn, startrow + i);
+                                }
+                                Grid.SetColumn(drpDwn, col);
+                                col++;
+                                drpDwn.ItemsSource = lstSupportedValues;
+                                drpDwn.SelectedValue = currentConfigParamValue;
+
+                                // Whenever CAN_DRIVER_MAILBOXx_INTERRUPT_CTRL(x=1…64)  checkbox is disabled,
+                                // the child [INTERRUPT_PRIORITY] configurations should be greyed out so that user cannot select any values
+                                if (currentConfigParamChild.PARAMETERVALUES.DEFINITIONREF.name.Contains("INTERRUPT_PRIORITY") &&
+                                    currentConfigParamParent.SUBCONTAINERS[i - 1].PARAMETERVALUES.DEFINITIONREF.name.Contains("INTERRUPT_CTRL") &&
+                                    currentConfigParamParent.SUBCONTAINERS[i - 1].PARAMETERVALUES.VALUE.Value.ToLower().Equals("disable"))
+                                {
+                                    drpDwn.IsEnabled = false;
+                                }
+
+                                DynamicGrid.Children.Add(drpDwn);
+                                break;
+                            case "Textbox":
+                                TextBox txtBox = new TextBox();
+                                txtBox.Text = currentConfigParamValue;
+                                txtBox.FontSize = 12;
+                                txtBox.FontWeight = FontWeights.Bold;
+                                txtBox.Height = 30;
+                                txtBox.Background = Brushes.White;
+                                txtBox.IsEnabled = areChildControlsEnabled;
+                                txtBox.Name = currentConfigParamID + "_Val";
+                                txtBox.LostFocus += TxtBox_LostFocus;
+                                if (isParentAdded)
+                                {
+                                    Grid.SetRow(txtBox, startrow + i + 2);
+                                }
+                                else
+                                {
+                                    Grid.SetRow(txtBox, startrow + i);
+                                }
+                                Grid.SetColumn(txtBox, col);
+                                col++;
+                                DynamicGrid.Children.Add(txtBox);
+                                break;
+                            case "Checkbox":
+                                CheckBox chkBox = new CheckBox();
+                                chkBox.IsChecked = currentConfigParamValue.ToString().Equals("ENABLE", StringComparison.OrdinalIgnoreCase) ? true : false;
+                                chkBox.FontSize = 12;
+                                chkBox.FontWeight = FontWeights.Bold;
+                                chkBox.Height = 15;
+                                chkBox.Background = Brushes.White;
+                                chkBox.IsEnabled = areChildControlsEnabled;
+                                chkBox.Name = currentConfigParamID + "_Val";
+                                if (currentConfigParamID.Contains("INTERRUPT_CTRL"))
+                                    chkBox.Click += ChkBox_Click;
+                                if (isParentAdded)
+                                {
+                                    Grid.SetRow(chkBox, startrow + i + 2);
+                                }
+                                else
+                                {
+                                    Grid.SetRow(chkBox, startrow + i);
+                                }
+
+                                Grid.SetColumn(chkBox, col);
+                                col++;
+                                DynamicGrid.Children.Add(chkBox);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+
+                    startrow += currentConfigParamParent.SUBCONTAINERS.Length;
+                    if (isParentAdded)
+                        break;
+
+                    // Add a splitter for each set of config values
+
+                    //Separator sep = new Separator();
+                    //sep.Background = Brushes.Red;
+                    //sep.Height = 5;
+                    //sep.Width = 150;
+                    //Grid.SetRow(sep, startrow);
+                    //DynamicGrid.Children.Add(sep);
+
+                    startrow++;
+                }
+            }
+
+            // Display grid into a Window
+            SpForDynamicGrid.Children.Add(DynamicGrid);
+        }
+
+
+
+        private void CreateDynamicWPFGridForModuleStaticCan()
+        {
+
+            ConfigGenerator.Models.DockingManagerModelHelper.GenerateCantoolsConfigurationsTxt();
+            string modulename = "StaticCan";
+
+
+            // Clear any existing contents. This will help when we change modules
+            SpForDynamicGridStaticCan.Children.Clear();
+
+            // Create the Grid
+            Grid DynamicGrid = new Grid();
+            DynamicGrid.Width = 900;
+            DynamicGrid.HorizontalAlignment = HorizontalAlignment.Left;
+            DynamicGrid.VerticalAlignment = VerticalAlignment.Top;
+            DynamicGrid.ShowGridLines = false;
+            DynamicGrid.Name = modulename;
+
+            // Create Columns
+            ColumnDefinition gridCol1 = new ColumnDefinition();
+            ColumnDefinition gridCol2 = new ColumnDefinition();
+            ColumnDefinition gridCol3 = new ColumnDefinition();
+            ColumnDefinition gridCol4 = new ColumnDefinition();
+            ColumnDefinition gridCol5 = new ColumnDefinition();
+            ColumnDefinition gridCol6 = new ColumnDefinition();
+            ColumnDefinition gridCol7 = new ColumnDefinition();
+
+            DynamicGrid.ColumnDefinitions.Add(gridCol1);
+            DynamicGrid.ColumnDefinitions.Add(gridCol2);
+            DynamicGrid.ColumnDefinitions.Add(gridCol3);
+            DynamicGrid.ColumnDefinitions.Add(gridCol4);
+            DynamicGrid.ColumnDefinitions.Add(gridCol5);
+            DynamicGrid.ColumnDefinitions.Add(gridCol6);
+            DynamicGrid.ColumnDefinitions.Add(gridCol7);
+
+            int startrow =1;
+            int col = 0;
+            List<string> lstNetWorkNodes = new List<string>();
+            string[] lines = File.ReadAllLines(DockingManagerModelHelper.TargetOutputFolderPath+"\\node.txt");
+          
+            JavaScriptSerializer json_serializer = new JavaScriptSerializer();
+
+            Dictionary<String, Object> tx = (Dictionary<String, Object>)json_serializer.DeserializeObject(lines[0]);
+
+            Dictionary<String, Object> rx =
+                  (Dictionary<String, Object>)json_serializer.DeserializeObject(lines[1]);
+
+
+            
+
+
+
+
+
+            TextBlock lblNetworkNode = new TextBlock();
+                            lblNetworkNode.Text = "NetWork Nodes";
+                            lblNetworkNode.Name = "NetWork_Nodes" + "_LbL";
+                            lblNetworkNode.FontFamily = new FontFamily("Calibri");
+                            lblNetworkNode.FontSize = 14;
+                            lblNetworkNode.VerticalAlignment = VerticalAlignment.Center;
+                            lblNetworkNode.TextWrapping = TextWrapping.Wrap;
+                            lblNetworkNode.ToolTip = "NetWork Nodes".Trim();
+                            Grid.SetRow(lblNetworkNode, startrow );
+                            Grid.SetColumn(lblNetworkNode, col);
+                            col++;
+                            DynamicGrid.Children.Add(lblNetworkNode);
+
+
+            ComboBox drpDwnNetworkBox = new ComboBox();
+            drpDwnNetworkBox.Name = "ComboNetworkNode" + "_Val";
+            drpDwnNetworkBox.FontSize = 12;
+            drpDwnNetworkBox.FontWeight = FontWeights.Bold;
+            drpDwnNetworkBox.Height = 30;
+            drpDwnNetworkBox.Background = Brushes.White;
+            drpDwnNetworkBox.IsSynchronizedWithCurrentItem = true;
+            drpDwnNetworkBox.SelectedIndex = 0;
+            drpDwnNetworkBox.ItemsSource = tx.Keys.ToList();
+            drpDwnNetworkBox.SelectionChanged += drpDwnNetworkBox_SelectionChanged;
+           
+            Grid.SetRow(drpDwnNetworkBox, startrow );
+            Grid.SetColumn(drpDwnNetworkBox, col);
+            col++;
+          
+           
+           
+              DynamicGrid.Children.Add(drpDwnNetworkBox);
+
+
+
+
+
+
+
+
+            startrow++;
+                        TextBlock lblTxNetworkNode = new TextBlock();
+            lblTxNetworkNode.Text = "Tx Messages";
+            lblTxNetworkNode.Name = "Tx_Messages" + "_LbL";
+            lblTxNetworkNode.FontFamily = new FontFamily("Calibri");
+            lblTxNetworkNode.FontSize = 14;
+            lblTxNetworkNode.VerticalAlignment = VerticalAlignment.Center;
+            lblTxNetworkNode.TextWrapping = TextWrapping.Wrap;
+            lblTxNetworkNode.ToolTip = "Tx Messages".Trim();
+            Grid.SetRow(lblTxNetworkNode, startrow);
+            Grid.SetColumn(lblTxNetworkNode, col);
+            col++;
+            DynamicGrid.Children.Add(lblTxNetworkNode);
+
+
+            ComboBox drpDwnTxNetworkBox = new ComboBox();
+            drpDwnTxNetworkBox.Name = "ComboNetworkNodeTx" + "_Val";
+            drpDwnTxNetworkBox.FontSize = 12;
+            drpDwnTxNetworkBox.FontWeight = FontWeights.Bold;
+            drpDwnTxNetworkBox.Height = 30;
+            drpDwnTxNetworkBox.Background = Brushes.White;
+            drpDwnTxNetworkBox.IsSynchronizedWithCurrentItem = true;
+            drpDwnTxNetworkBox.SelectedIndex = 0;
+         //   drpDwnTxNetworkBox.SelectionChanged += drpDwnTxNetworkBox_SelectionChanged;
+            Grid.SetRow(drpDwnTxNetworkBox, startrow);
+           
+            Grid.SetColumn(drpDwnTxNetworkBox, col);
+
+            col++;
+          
+            Object lvaluesTx = new object();
+            tx.TryGetValue(tx.Keys.ToList()[0], out lvaluesTx);
+            drpDwnTxNetworkBox.ItemsSource = ((Object[])lvaluesTx).ToList();
+           
+
+
+            
+            using (StreamWriter outputFile = new StreamWriter(Path.Combine(DockingManagerModelHelper.TargetOutputFolderPath, "cf.h")))
+            {
+                string[] lines2 = File.ReadAllLines(DockingManagerModelHelper.TargetOutputFolderPath + "\\updated_db.h");
+
+                for (int linNo = 0; linNo < 45; linNo++)
+                {
+                    outputFile.WriteLine(lines2[linNo]);
+                }
+                foreach (Object ii in tx.Keys.ToList())
+                {
+
+
+                    Object lvaluesTxs = new object();
+                    tx.TryGetValue(ii.ToString(), out lvaluesTxs);
+                    int v = 0;
+                    foreach (object jj in ((Object[])lvaluesTxs).ToList())
+                    {
+
+                        outputFile.WriteLine("#define  " + jj.ToString() + "      " + v + "u");
+                        v++;
+                    }
+                }
+                for (int linNo = 45; linNo < lines2.Length; linNo++)
+                {
+                    outputFile.WriteLine(lines2[linNo]);
+                }
+            }
+           
+
+
+
+
+
+            DynamicGrid.Children.Add(drpDwnTxNetworkBox);
+
+
+
+            TextBlock lblRxNetworkNode = new TextBlock();
+            lblRxNetworkNode.Text = "Rx Messages";
+            lblRxNetworkNode.Name = "Rx_Messages" + "_LbL";
+            lblRxNetworkNode.FontFamily = new FontFamily("Calibri");
+            lblRxNetworkNode.FontSize = 14;
+            lblRxNetworkNode.VerticalAlignment = VerticalAlignment.Center;
+            lblRxNetworkNode.TextWrapping = TextWrapping.Wrap;
+            lblRxNetworkNode.ToolTip = "Rx Messages".Trim();
+            Grid.SetRow(lblRxNetworkNode, startrow);
+            Grid.SetColumn(lblRxNetworkNode, col);
+            col++;
+            DynamicGrid.Children.Add(lblRxNetworkNode);
+
+
+            ComboBox drpDwnRxNetworkBox = new ComboBox();
+            drpDwnRxNetworkBox.Name = "ComboNetworkNodeRx" + "_Val";
+            drpDwnRxNetworkBox.FontSize = 12;
+            drpDwnRxNetworkBox.FontWeight = FontWeights.Bold;
+            drpDwnRxNetworkBox.Height = 30;
+            drpDwnRxNetworkBox.Background = Brushes.White;
+            drpDwnRxNetworkBox.IsSynchronizedWithCurrentItem = true;
+            drpDwnRxNetworkBox.SelectedIndex = 0;
+            // drpDwnTxNetworkBox.SelectionChanged += drpDwnMailBox_SelectionChanged;
+            Grid.SetRow(drpDwnRxNetworkBox, startrow);
+
+            Grid.SetColumn(drpDwnRxNetworkBox, col);
+
+
+
+            Object lvaluesRx = new object();
+            rx.TryGetValue(rx.Keys.ToList()[0], out lvaluesRx);
+            drpDwnRxNetworkBox.ItemsSource = ((Object[])lvaluesRx).ToList();
+
+
+
+
+
+            DynamicGrid.Children.Add(drpDwnRxNetworkBox);
+
+
+
+
+
+            // Display grid into a Window
+            SpForDynamicGridStaticCan.Children.Add(DynamicGrid);
+        }
+
+        private void ChkBox_Click(object sender, RoutedEventArgs e)
+        {
+            var cb = sender as CheckBox;
+            var grd = SpForDynamicGrid.Children.OfType<Grid>().FirstOrDefault();
+
+            if (grd != null)
+            {
+                var currSelectedMailBox = grd.Children
+                                            .OfType<ComboBox>()
+                                            .Where(cbx => cbx.Name == "CAN_DRIVER_MAILBOX_INTERRUPT_PRIORITY_Val")
+                                            .FirstOrDefault();
+                var c4 = currSelectedMailBox as System.Windows.Controls.ComboBox;
+                c4.IsEnabled = (bool)cb.IsChecked;
+            }
+
+        }
+
+        private void MailboxCtrl_Clicked(object sender, RoutedEventArgs e)
+        {
+            var cb = sender as CheckBox;
+
+            var grd = SpForDynamicGrid.Children.OfType<Grid>().FirstOrDefault();
+
+            if (grd != null)
+            {
+                var currSelectedMailBox = grd.Children
+                                            .OfType<ComboBox>()
+                                            .Where(cbx => cbx.Name == cb.Name.ToString())
+                                            .FirstOrDefault();
+                if (currSelectedMailBox != null)
+                {
+                    var currSelectedMailBoxCB = grd.Children
+                                                .OfType<CheckBox>()
+                                                .Where(cbx => cbx.Name == currSelectedMailBox.Name.ToString())
+                                                .FirstOrDefault();
+
+                    if (currSelectedMailBoxCB != null)
+                    {
+                        var a1 = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(a => a.SHORTNAME == DockingManagerModelHelper.ModuleName).FirstOrDefault();
+                        var a2 = a1.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Where(b => b.SUBCONTAINERS.Length > 1).FirstOrDefault();
+                        var currentConfigParamChild = a2.SUBCONTAINERS.Where(c => c.SHORTNAME.Equals(currSelectedMailBox.SelectedValue.ToString(), StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
+
+                        // Update the user input value back to the object
+                        currentConfigParamChild.PARAMETERVALUES.VALUE.Value = (bool)cb.IsChecked ? "ENABLE" : "DISABLE";
+
+                        //Below loop will is used to change enable/disable the child controls.
+                        foreach (var child in grd.Children)
+                        {
+                            switch (child.GetType().Name.ToLower())
+                            {
+                                case "textbox":
+                                    var c2 = child as System.Windows.Controls.TextBox;
+                                    string str = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c2.Name.Substring(0, c2.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                    if (c2.Name.Equals(str + "_Val", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        c2.IsEnabled = (bool)cb.IsChecked;
+                                    }
+                                    break;
+                                case "checkbox":
+                                    var c3 = child as System.Windows.Controls.CheckBox;
+                                    string strCB = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c3.Name.Substring(0, c3.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                    if (c3.Name.Equals(strCB + "_Val", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        c3.IsEnabled = (bool)cb.IsChecked;
+                                    }
+                                    break;
+                                case "combobox":
+                                    var c4 = child as System.Windows.Controls.ComboBox;
+                                    string strCmb = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c4.Name.Substring(0, c4.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                    if (c4.Name.Equals(strCmb + "_Val", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        c4.IsEnabled = (bool)cb.IsChecked;
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void TxtBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var tb = sender as TextBox;
+
+            var tempParamName = tb.Name.Remove(tb.Name.Length - 4);
+
+            var obj = RetrieveConfigParamObject(tempParamName);
+
+            string MinimumValue = obj.PARAMETERVALUES.SUPPORTEDVALUES.MinValue.ToString();
+            string MaximumValue = obj.PARAMETERVALUES.SUPPORTEDVALUES.MaxValue.ToString();
+
+            uint userInput;
+            bool parseSuccess = uint.TryParse(tb.Text, System.Globalization.NumberStyles.HexNumber, null, out userInput);
+
+            uint minvalue;
+            parseSuccess = uint.TryParse(obj.PARAMETERVALUES.SUPPORTEDVALUES.MinValue.ToString(), System.Globalization.NumberStyles.HexNumber, null, out minvalue);
+
+            uint maxvalue;
+            parseSuccess = uint.TryParse(obj.PARAMETERVALUES.SUPPORTEDVALUES.MaxValue.ToString(), System.Globalization.NumberStyles.HexNumber, null, out maxvalue);
+
+            if ((userInput < minvalue) || (userInput > maxvalue))
+            {
+                // Validation failed, Throw erro msg and take the focus back to the textbox
+                MessageBox.Show(String.Format("Entered value of {0} should be between {1} and {2}, both values included", obj.PARAMETERVALUES.DEFINITIONREF.name, MinimumValue, MaximumValue));
+                tb.Text = obj.PARAMETERVALUES.VALUE.Value.ToString();
+            }
+        }
+
+
+        private void drpDwnNetworkBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var dd = (sender as ComboBox);
+            string sItem = (string)dd.SelectedItem;
+            var grd = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[1];
+            var grdR = SpForDynamicGridStaticCan.Children.OfType<Grid>().ToList()[0].Children.OfType<ComboBox>().ToList()[2];
+            Object lvaluesTx = new object();
+            Object lvaluesRx = new object();
+            string[] lines = File.ReadAllLines(DockingManagerModelHelper.TargetOutputFolderPath + "\\node.txt");
+
+            JavaScriptSerializer json_serializer = new JavaScriptSerializer();
+
+            Dictionary<String, Object> tx = (Dictionary<String, Object>)json_serializer.DeserializeObject(lines[0]);
+
+            Dictionary<String, Object> rx =
+                  (Dictionary<String, Object>)json_serializer.DeserializeObject(lines[1]); 
+            tx.TryGetValue(sItem, out lvaluesTx);
+            grd.ItemsSource = ((Object[])lvaluesTx).ToList();
+            rx.TryGetValue(sItem, out lvaluesRx);
+            grdR.ItemsSource = ((Object[])lvaluesRx).ToList();
+
+
+
+        }
+
+            private void drpDwnMailBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var dd = (sender as ComboBox);
+            var sItem = dd.SelectedItem;
+            var grd = SpForDynamicGrid.Children.OfType<Grid>().FirstOrDefault();
+
+            if (grd != null)
+            {
+                GetUpdatedValuesForConfigGeneration();
+                var currSelectedMailBox = grd.Children
+                                            .OfType<ComboBox>()
+                                            .Where(cb => cb.Name == dd.Name.ToString())
+                                            .FirstOrDefault();
+
+                var a1 = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(a => a.SHORTNAME == DockingManagerModelHelper.ModuleName).FirstOrDefault();
+                var a2 = a1.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Where(b => b.SUBCONTAINERS.Length > 1).FirstOrDefault();
+                var currentConfigParamChild = a2.SUBCONTAINERS.Where(c => c.SHORTNAME.Equals(currSelectedMailBox.SelectedValue.ToString(), StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
+
+                string strEnableControls = a2.SUBCONTAINERS.Where(c => c.SHORTNAME.Equals(currSelectedMailBox.SelectedValue.ToString(), StringComparison.OrdinalIgnoreCase)).Select(c => c.PARAMETERVALUES.VALUE.Value).FirstOrDefault();
+
+                // Enable/Disable the checkbox for the parent MailBox
+                var tlist = grd.Children.OfType<CheckBox>().ToList();
+                var currSelectedMailBoxCB = grd.Children
+                                            .OfType<CheckBox>()
+                                            .Where(cb => cb.Name == currSelectedMailBox.Name.ToString())
+                                            .FirstOrDefault();
+                if (currSelectedMailBoxCB != null)
+                {
+                    if (strEnableControls.Equals("ENABLE", StringComparison.OrdinalIgnoreCase))
+                        currSelectedMailBoxCB.IsChecked = true;
+                    else
+                        currSelectedMailBoxCB.IsChecked = false;
+                }
+
+                for (int i = 0; i < currentConfigParamChild.SUBCONTAINERS.Length; i++)
+                {
+                    var currentConfigParamName = currentConfigParamChild.SUBCONTAINERS[i].PARAMETERVALUES.DEFINITIONREF.Value;
+                    var currentConfigParamValue = currentConfigParamChild.SUBCONTAINERS[i].PARAMETERVALUES.VALUE.Value;
+                }
+
+                if (currSelectedMailBox == null)
+                {
+                    // This config property was not rendered before. Choose the 1st item as default
+                }
+                else
+                {
+                    //Below loop will is used to change the values of the controls based on the dropdown selection.
+                    foreach (var child in grd.Children)
+                    {
+                        switch (child.GetType().Name.ToLower())
+                        {
+                            case "textblock":
+                                var c1 = child as System.Windows.Controls.TextBlock;
+                                if (c1.Name.Equals(currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c1.Name, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault(), StringComparison.OrdinalIgnoreCase))
+                                    c1.Text = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c1.Name, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.Value).FirstOrDefault();
+                                break;
+                            case "textbox":
+                                var c2 = child as System.Windows.Controls.TextBox;
+                                string str = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c2.Name.Substring(0, c2.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                if (c2.Name.Equals(str + "_Val", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    c2.Text = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(str, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.VALUE.Value).FirstOrDefault();
+                                    if (strEnableControls.Equals("ENABLE", StringComparison.OrdinalIgnoreCase))
+                                        c2.IsEnabled = true;
+                                    else
+                                        c2.IsEnabled = false;
+                                }
+
+                                break;
+                            case "checkbox":
+                                var c3 = child as System.Windows.Controls.CheckBox;
+                                string strCB = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c3.Name.Substring(0, c3.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                if (c3.Name.Equals(strCB + "_Val", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    c3.IsChecked = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(strCB, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.VALUE.Value).FirstOrDefault().ToString().Equals("ENABLE") ? true : false;
+                                    if (strEnableControls.Equals("ENABLE", StringComparison.OrdinalIgnoreCase))
+                                        c3.IsEnabled = true;
+                                    else
+                                        c3.IsEnabled = false;
+                                }
+                                break;
+                            case "combobox":
+                                var c4 = child as System.Windows.Controls.ComboBox;
+                                string strCmb = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(c4.Name.Substring(0, c4.Name.IndexOf("_Val")), StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.DEFINITIONREF.name).FirstOrDefault();
+                                if (c4.Name.Equals(strCmb + "_Val", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    c4.SelectedValue = currentConfigParamChild.SUBCONTAINERS.Where(a => a.PARAMETERVALUES.DEFINITIONREF.name.Equals(strCmb, StringComparison.OrdinalIgnoreCase)).Select(a => a.PARAMETERVALUES.VALUE.Value).FirstOrDefault();
+                                    if (strEnableControls.Equals("ENABLE", StringComparison.OrdinalIgnoreCase))
+                                        c4.IsEnabled = true;
+                                    else
+                                        c4.IsEnabled = false;
+                                }
+                                break;
+                        }
+                    }
+                }
+            }
+            DockingManagerModelHelper.SelectedMailBox = sItem.ToString();
+        }
+
+        /// <summary>
+        /// To get the full path of the TreeViewItemAdv
+        /// </summary>
+        public string GetFullPath(TreeViewItemAdv node)
+        {
+            if (node == null)
+                throw new ArgumentNullException();
+
+            var result = Convert.ToString(node.Header);
+
+            for (var i = GetParentItem(node); i != null; i = GetParentItem(i))
+                result = i.Header + "\\" + result;
+
+            return result;
+        }
+
+        /// <summary>
+        /// To get the parent of the item
+        /// </summary>
+        static TreeViewItemAdv GetParentItem(TreeViewItemAdv item)
+        {
+            for (var i = VisualTreeHelper.GetParent(item); i != null; i = VisualTreeHelper.GetParent(i))
+                if (i is TreeViewItemAdv)
+                    return (TreeViewItemAdv)i;
+
+            return null;
+        }
+
+        #endregion
+
+        #region Implementation
+        /// <summary>
+        /// Called when [loaded].
+        /// </summary>
+        /// <param name="sender">The sender.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            CurrentVisualStyle = "Metro";
+        }
+
+        /// <summary>
+        /// On Visual Style Changed.
+        /// </summary>
+        /// <remarks></remarks>
+        private void OnVisualStyleChanged()
+        {
+            VisualStyles visualStyle = VisualStyles.Default;
+            Enum.TryParse(CurrentVisualStyle, out visualStyle);
+            if (visualStyle != VisualStyles.Default)
+            {
+                SfSkinManager.ApplyStylesOnApplication = true;
+                SfSkinManager.SetVisualStyle(this, visualStyle);
+                SfSkinManager.ApplyStylesOnApplication = false;
+            }
+        }
+
+        /// <summary>
+        /// Menu item click 
+        /// </summary>
+        /// <param name="item"></param>
+        private void OnMenuItemClick(MenuItem item)
+        {
+            MenuItem parent = item.Parent as MenuItem;
+            foreach (MenuItem menuItem in parent.Items)
+            {
+                menuItem.IsChecked = false;
+            }
+            item.IsChecked = true;
+        }
+
+        /// <summary>
+        /// Set the active window
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+		private void OnActivateWindow(object sender, RoutedEventArgs e)
+        {
+            string name = (sender as MenuItem).Tag as string;
+            DockingManager.ActivateWindow(name);
+        }
+
+        /// <summary>
+        /// Initialize the windows forms host
+        /// </summary>
+        private void InitWindowsFormsHost()
+        {
+            if (DockingManager.UseInteropCompatibilityMode)
+            {
+                WindowsFormsHost host = new WindowsFormsHost();
+                WinForms.Button btn = new WinForms.Button();
+                btn.Text = "Winows Forms Button";
+                host.Child = btn;
+                // FindResults.Content = host;
+                WindowsFormsHost.EnableWindowsFormsInterop();
+            }
+        }
+
+        /// <summary>
+        /// Ckear the events
+        /// </summary>
+        private void OnClear(object sender, EventArgs args)
+        {
+            Log.Text = "";
+        }
+
+        /// <summary>
+        /// Events
+        /// </summary>
+        private void SubscribeForEvents()
+        {
+            //Subscribe the AutoHideAnimationStart property changed event
+            DockingManager.AutoHideAnimationStart += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the AutoHideAnimationStop property changed event
+            DockingManager.AutoHideAnimationStop += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the WindowActivated property changed event
+            DockingManager.WindowActivated += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the WindowDeactivated property changed event
+            DockingManager.WindowDeactivated += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the WindowDragStart property changed event
+            DockingManager.WindowDragStart += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the WindowDragEnd property changed event
+            DockingManager.WindowDragEnd += new RoutedEventHandler(OnEventRaising);
+
+            //Subscribe the ActiveWindow property changed event
+            DockingManager.ActiveWindowChanged += new PropertyChangedCallback(OnPropertyChanged);
+        }
+
+        #endregion
+
+        #region Events
+        /// <summary>
+        /// Routed event raising
+        /// </summary>
+        private void OnEventRaising(object sender, RoutedEventArgs e)
+        {
+            FrameworkElement element = e.OriginalSource as FrameworkElement;
+            string name = element != null ? element.Name : string.Empty;
+            Log.TextWrapping = TextWrapping.Wrap;
+            Log.Text = Log.Text + e.RoutedEvent.Name + " : " + name + "\n";
+            Scroll.ScrollToBottom();
+
+        }
+
+        /// <summary>
+        /// Property changed event raising
+        /// </summary>
+		private void OnPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            string name = e.NewValue != null ? (e.NewValue as FrameworkElement).Name : string.Empty;
+            Log.TextWrapping = TextWrapping.Wrap;
+            Log.Text = Log.Text + e.Property.Name + " : " + name + "\n";
+            Scroll.ScrollToBottom();
+        }
+
+        #endregion
+
+        bool m_layoutflag = true;
+        private void DockingManager_LayoutUpdated(object sender, EventArgs e)
+        {
+            if (m_layoutflag)
+            {
+                // SfSkinManager.SetVisualStyle(this, VisualStyles.Metro);
+                m_layoutflag = false;
+            }
+        }
+
+        /// <summary>
+        /// Handles the CloseAllTabs event of the DockingManager control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="Syncfusion.Windows.Tools.Controls.CloseTabEventArgs"/> instance containing the event data.</param>
+        private void DockingManager_CloseAllTabs(object sender, CloseTabEventArgs e)
+        {
+            string closingtabs = "";
+            MessageBoxResult result = MessageBox.Show("Do you want to close the tabs? ", "Closing Tabs", MessageBoxButton.YesNo);
+            if (result == MessageBoxResult.Yes)
+            {
+                for (int i = 0; i < e.ClosingTabItems.Count; i++)
+                {
+                    TabItemExt tabitem = e.ClosingTabItems[i] as TabItemExt;
+                    if (tabitem.Content != null && (tabitem.Content as ContentPresenter) != null)
+                    {
+                        ContentPresenter presenter = tabitem.Content as ContentPresenter;
+                        if (presenter != null && presenter.Content != null)
+                        {
+                            closingtabs = closingtabs + "\n\t" + DockingManager.GetHeader(presenter.Content as DependencyObject);
+                        }
+                    }
+                }
+                Log.TextWrapping = TextWrapping.Wrap;
+                Log.Text = Log.Text + "Closed Tabs" + " : " + closingtabs + "\n";
+                Scroll.ScrollToBottom();
+            }
+            else if (result == MessageBoxResult.No)
+            {
+                e.Cancel = true;
+            }
+        }
+
+        /// <summary>
+        /// Handles the CloseOtherTabs event of the DockingManager control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="Syncfusion.Windows.Tools.Controls.CloseTabEventArgs"/> instance containing the event data.</param>
+        private void DockingManager_CloseOtherTabs(object sender, CloseTabEventArgs e)
+        {
+            string closingtabs = "";
+            MessageBoxResult result = MessageBox.Show("Do you want to close the tabs? ", "Closing Tabs", MessageBoxButton.YesNo);
+            if (result == MessageBoxResult.Yes)
+            {
+                for (int i = 0; i < e.ClosingTabItems.Count; i++)
+                {
+                    TabItemExt tabitem = e.ClosingTabItems[i] as TabItemExt;
+                    if (tabitem.Content != null && (tabitem.Content as ContentPresenter) != null)
+                    {
+                        ContentPresenter presenter = tabitem.Content as ContentPresenter;
+                        if (presenter != null && presenter.Content != null)
+                        {
+                            closingtabs = closingtabs + "\n\t" + DockingManager.GetHeader(presenter.Content as DependencyObject);
+                        }
+                    }
+                }
+                Log.TextWrapping = TextWrapping.Wrap;
+                Log.Text = Log.Text + "Closed Tabs" + " : " + closingtabs + "\n";
+                Scroll.ScrollToBottom();
+            }
+            else if (result == MessageBoxResult.No)
+            {
+                e.Cancel = true;
+            }
+        }
+
+        private void DockingManager_IsSelectedDocument(FrameworkElement sender, IsSelectedChangedEventArgs e)
+        {
+            if (DockingManager.DocContainer != null && SfSkinManager.GetVisualStyle(this) != SfSkinManager.GetVisualStyle(DockingManager.DocContainer as DependencyObject))
+            {
+                SfSkinManager.SetVisualStyle(DockingManager.DocContainer as DependencyObject, SfSkinManager.GetVisualStyle(this));
+            }
+        }
+
+        private void OpenBtn_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            Serializer ser = new Serializer();
+            string stringFile = string.Empty;
+            string FileExt = string.Empty;
+            string DirPath = string.Empty;
+
+            if (Directory.GetCurrentDirectory().Contains("bin"))
+            {
+                DirPath = Directory.GetCurrentDirectory().Substring(0, Directory.GetCurrentDirectory().IndexOf("\\bin"));
+            }
+            else
+            {
+                DirPath = Directory.GetCurrentDirectory();
+            }
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                stringFile = File.ReadAllText(openFileDialog.FileName);
+                FileExt = Path.GetExtension(openFileDialog.FileName);
+            }
+            if (FileExt.Equals(".arxml", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    DockingManagerModelHelper.Configuration = ser.Deserialize<AUTOSAR>(stringFile);
+                    DockingManagerModelHelper.ProjectName = DockingManagerModelHelper.Configuration.ARPACKAGES[0].ELEMENTS.ECUCMODULECONFIGURATIONVALUES.DEFINITIONREF.Value;
+                    File.WriteAllText(DockingManagerModelHelper.TargetInputFolderPath + "\\DefaultConfig.arxml", stringFile);
+                    PopulateWorkspaceExplorer();
+                    CreateDynamicWPFGridForModule();
+
+                    MessageBox.Show(openFileDialog.FileName + " Loaded Successfully.");
+                }
+                catch (Exception)
+                {
+                    MessageBox.Show("Invalid ARXML format....Please select an ARXML file with defined format.");
+                }
+            }
+            else if (FileExt.Equals(".dbc", StringComparison.OrdinalIgnoreCase))
+            {
+                File.WriteAllText(DockingManagerModelHelper.TargetInputFolderPath + "\\Sample_DB.dbc", stringFile);
+                MessageBox.Show(openFileDialog.FileName + " Loaded Successfully.");
+            }
+            else if (FileExt.Equals(".h", StringComparison.OrdinalIgnoreCase))
+            {
+                File.WriteAllText(DockingManagerModelHelper.TargetInputFolderPath + "\\CAN_Driver_cfg.h", stringFile);
+                MessageBox.Show(openFileDialog.FileName + " Loaded Successfully.");
+            }
+            else
+            {
+                MessageBox.Show("Only files having extension .ARXML, .DBC and .h files can be opened.");
+            }
+        }
+
+        private void GenerateBtn_Click(object sender, RoutedEventArgs e)
+        {
+            bool isCantoolsConfigGenerated = false;
+            bool isConfigGenerated = false;
+            string Message = string.Empty;
+            if (!File.Exists(DockingManagerModelHelper.TargetInputFolderPath + "\\CAN_Driver_cfg.h"))
+            {
+                isConfigGenerated = false;
+                //MessageBox.Show("Please Upload Corresponding Config.h file for the uploaded ARXML file at following location..." + DockingManagerModelHelper.TargetInputFolderPath);
+            }
+            else
+            {
+                GetUpdatedValuesForConfigGeneration();
+                DockingManagerModelHelper.UpdateARXML();
+                DockingManagerModelHelper.GenerateConfigFile();
+                isConfigGenerated = true;
+            }
+            if (File.Exists(DockingManagerModelHelper.TargetInputFolderPath + "\\Sample_DB.dbc"))
+            {
+                DockingManagerModelHelper.GenerateCantoolsConfigurations();
+                isCantoolsConfigGenerated = true;
+            }
+            else
+            {
+                isCantoolsConfigGenerated = false;
+                //MessageBox.Show("Please Upload .DBC file to Generate Cantools Config Files at following location..." + DockingManagerModelHelper.TargetInputFolderPath);
+            }
+
+            if (isCantoolsConfigGenerated && isConfigGenerated)
+            {
+                Message = "Output Files Generated and Saved Successfully at following path : " + DockingManagerModelHelper.TargetOutputFolderPath;
+            }
+            else if (isConfigGenerated && !isCantoolsConfigGenerated)
+            {
+                Message = "1) Config File Generated Successfully at Following Location..." + DockingManagerModelHelper.TargetInputFolderPath + Environment.NewLine + Environment.NewLine
+                    + "2) Cantools Confing Could not be Generated, Please Upload .DBC file to Generate Cantools Config Files at following location..." + DockingManagerModelHelper.TargetInputFolderPath;
+            }
+            else if (!isConfigGenerated && isCantoolsConfigGenerated)
+            {
+                Message = "1) Config file Could not be generated, Please upload corresponding config.h file for the uploaded ARXML file at following location..." + DockingManagerModelHelper.TargetInputFolderPath + Environment.NewLine + Environment.NewLine
+                   + "2) Cantools confing files generated at following location..." + DockingManagerModelHelper.TargetInputFolderPath;
+            }
+            else if (!isConfigGenerated && !isCantoolsConfigGenerated)
+            {
+                Message = "Output files not generated... Please check and upload corresponding Config.H and .DBC Files at following location..." + DockingManagerModelHelper.TargetInputFolderPath;
+            }
+            MessageBox.Show(Message);
+        }
+
+        private void ValidateBtn_Click(object sender, RoutedEventArgs e)
+        {
+            // For now, we are not doing any extra validation
+            // All validations are done real time, during the user input itself.
+            // Just return success. Everyone is happy :)
+            MessageBox.Show("Validation of user entered values successful");
+        }
+
+        private List<string> GetValuesFromArxml(AUTOSAR objAutoSAR, string modulename, string node)
+        {
+            var currentmodule = objAutoSAR.ARPACKAGES.Where(x => x.SHORTNAME.ToString().ToLower().Equals(modulename.ToLower())).FirstOrDefault();
+
+            var objSupportedValues = from Pkgs in currentmodule.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[0].SUBCONTAINERS
+                                     where Pkgs.SHORTNAME.Equals(node, StringComparison.OrdinalIgnoreCase)
+                                     select Pkgs.PARAMETERVALUES.SUPPORTEDVALUES.ToList();
+            var lst = objSupportedValues.ToList();
+
+            List<string> resultList = new List<string>();
+            if (lst.Count > 0)
+            {
+                foreach (string itm in lst[0])
+                {
+                    resultList.Add(Convert.ToString(itm));
+                }
+            }
+            return resultList;
+        }
+
+
+        private void wsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            var sItem = (sender as TreeViewAdv).SelectedItem as TreeViewItemAdv;
+
+            DockingManagerModelHelper.ModuleName = sItem.Header.ToString();
+
+            // Save the changes in the UI elements
+            var currentGrid = SpForDynamicGrid.Children.OfType<Grid>().Where(x => x.Name.ToLower() == DockingManagerModelHelper.ModuleName.ToLower()).FirstOrDefault();
+            var currPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => x.SHORTNAME.ToLower() == DockingManagerModelHelper.ModuleName.ToLower()).FirstOrDefault();
+
+            if ((currentGrid != null) && (currPackage != null))
+            {
+                // Get the config objects for this module
+                foreach (var child in currentGrid.Children)
+                {
+                    // The below if condition is needed to weed out Labels. They can't be updated
+                    if (!(child.GetType().FullName.Equals("System.Windows.Controls.TextBlock")))
+                    {
+                        string tempName = "";
+                        string tempValue = "";
+
+                        switch (child.GetType().Name.ToLower())
+                        {
+                            case "textbox":
+                                var c1 = child as System.Windows.Controls.TextBox;
+                                tempName = c1.Name.Remove(c1.Name.Length - 4);
+                                tempValue = c1.Text;
+                                break;
+                            case "checkbox":
+                                var c2 = child as System.Windows.Controls.CheckBox;
+                                tempName = c2.Name.Remove(c2.Name.Length - 4);
+                                tempValue = (bool)c2.IsChecked ? "ENABLE" : "DISABLE";
+                                break;
+                            case "combobox":
+                                var c3 = child as System.Windows.Controls.ComboBox;
+                                tempName = c3.Name.Remove(c3.Name.Length - 4);
+                                tempValue = c3.SelectedValue.ToString();
+                                break;
+                        }
+
+                        var currObj = currPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[0].SUBCONTAINERS
+                            .Where(x => ((x.PARAMETERVALUES != null) && (x.PARAMETERVALUES.DEFINITIONREF.Value == tempName))).FirstOrDefault();
+
+                        if (currObj != null)
+                            currObj.PARAMETERVALUES.VALUE.Value = tempValue;
+                    }
+                }
+            }
+
+            CreateDynamicWPFGridForModule();
+        }
+
+        private void GetUpdatedValuesForConfigGeneration()
+        {
+            Grid grd = SpForDynamicGrid.Children[0] as Grid;
+            string key = string.Empty;
+            for (int i = 0; i < grd.Children.Count; i++)
+            {
+                if (grd.Children[i].GetType() == typeof(TextBlock))
+                {
+                    key = (grd.Children[i] as TextBlock).Text;
+                }
+                if (i + 1 < grd.Children.Count && grd.Children[i + 1].GetType() == typeof(ComboBox))
+                {
+                    string value = (grd.Children[i + 1] as ComboBox).SelectedValue.ToString();
+                    UpdateObject(key, value);
+                }
+                if (i + 1 < grd.Children.Count && grd.Children[i + 1].GetType() == typeof(TextBox))
+                {
+                    string value = (grd.Children[i + 1] as TextBox).Text.ToString();
+                    UpdateObject(key, value);
+                }
+                if (i + 1 < grd.Children.Count && grd.Children[i + 1].GetType() == typeof(CheckBox))
+                {
+                    string value = (bool)(grd.Children[i + 1] as CheckBox).IsChecked ? "ENABLE" : "DISABLE";
+                    UpdateObject(key, value);
+                }
+            }
+        }
+
+        public void UpdateObject(string key, string value)
+        {
+            bool isObjectFound = false;
+
+            var currentPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => String.Equals(x.SHORTNAME.ToString().ToLower(), DockingManagerModelHelper.ModuleName.ToLower())).FirstOrDefault();
+
+            for (int j = 0; j < currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Length; j++)
+            {
+                var currentConfigParamGrandParent = currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[j];
+                //TODO: Need to refine below code to accept only filtered object.
+                for (int k = 0; k < currentConfigParamGrandParent.SUBCONTAINERS.Length; k++)
+                {
+                    List<string> lstSupportedValues = new List<string>();
+                    string strControlType = string.Empty;
+                    var currentConfigParamParent = currentConfigParamGrandParent.SUBCONTAINERS[k];
+                    if (currentConfigParamParent.PARAMETERVALUES != null && currentConfigParamParent.PARAMETERVALUES.DEFINITIONREF.Value.Equals(key, StringComparison.OrdinalIgnoreCase))
+                    {
+                        currentConfigParamParent.PARAMETERVALUES.VALUE.Value = value;
+                        break;
+                    }
+
+
+                    // foreach (var currentConfigParamChild in currentConfigParamParent.SUBCONTAINERS)
+                    for (int i = 0; i < currentConfigParamParent.SUBCONTAINERS.Length; i++)
+                    {
+                        if (currentConfigParamParent.SUBCONTAINERS[i].PARAMETERVALUES.DEFINITIONREF.Value.Equals(key, StringComparison.OrdinalIgnoreCase))
+                        {
+                            currentConfigParamParent.SUBCONTAINERS[i].PARAMETERVALUES.VALUE.Value = value;
+                            isObjectFound = true;
+                            break;
+                        }
+                    }
+                    // if obj found, break out of all loops
+                    if (isObjectFound) break;
+                }
+                // if obj found, break out of all loops
+                if (isObjectFound) break;
+            }
+        }
+
+        public AUTOSARARPACKAGEELEMENTSECUCMODULECONFIGURATIONVALUESCONTAINERSECUCCONTAINERVALUEECUCCONTAINERVALUEECUCCONTAINERVALUE RetrieveConfigParamObject(string key)
+        {
+
+            bool isObjectFound = false;
+            AUTOSARARPACKAGEELEMENTSECUCMODULECONFIGURATIONVALUESCONTAINERSECUCCONTAINERVALUEECUCCONTAINERVALUEECUCCONTAINERVALUE obj = null;
+
+            var currentPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => String.Equals(x.SHORTNAME.ToString().ToLower(), DockingManagerModelHelper.ModuleName.ToLower())).FirstOrDefault();
+
+            for (int j = 0; j < currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Length; j++)
+            {
+                var currentConfigParamGrandParent = currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[j];
+
+                //TODO: Need to refine below code to accept only filtered object.
+                for (int k = 0; k < currentConfigParamGrandParent.SUBCONTAINERS.Length; k++)
+                {
+                    List<string> lstSupportedValues = new List<string>();
+                    string strControlType = string.Empty;
+                    var currentConfigParamParent = currentConfigParamGrandParent.SUBCONTAINERS[k];
+
+                    // foreach (var currentConfigParamChild in currentConfigParamParent.SUBCONTAINERS)
+                    for (int i = 0; i < currentConfigParamParent.SUBCONTAINERS.Length; i++)
+                    {
+                        if (currentConfigParamParent.SUBCONTAINERS[i].PARAMETERVALUES.DEFINITIONREF.name.Equals(key, StringComparison.OrdinalIgnoreCase))
+                        {
+                            obj = currentConfigParamParent.SUBCONTAINERS[i];
+                            isObjectFound = true;
+                            break;
+                        }
+                    }
+                    // if obj found, break out of all loops
+                    if (isObjectFound) break;
+                }
+                // if obj found, break out of all loops
+                if (isObjectFound) break;
+            }
+
+            return obj;
+        }
+
+        public AUTOSARARPACKAGEELEMENTSECUCMODULECONFIGURATIONVALUESCONTAINERSECUCCONTAINERVALUEECUCCONTAINERVALUE RetrieveConfigParamObjectParent(string key)
+        {
+
+            bool isObjectFound = false;
+            AUTOSARARPACKAGEELEMENTSECUCMODULECONFIGURATIONVALUESCONTAINERSECUCCONTAINERVALUEECUCCONTAINERVALUE obj = null;
+
+            var currentPackage = DockingManagerModelHelper.Configuration.ARPACKAGES.Where(x => String.Equals(x.SHORTNAME.ToString().ToLower(), DockingManagerModelHelper.ModuleName.ToLower())).FirstOrDefault();
+
+            for (int j = 0; j < currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS.Length; j++)
+            {
+                var currentConfigParamGrandParent = currentPackage.ELEMENTS.ECUCMODULECONFIGURATIONVALUES.CONTAINERS.SUBCONTAINERS[j];
+
+                //TODO: Need to refine below code to accept only filtered object.
+                for (int k = 0; k < currentConfigParamGrandParent.SUBCONTAINERS.Length; k++)
+                {
+                    List<string> lstSupportedValues = new List<string>();
+                    string strControlType = string.Empty;
+                    var currentConfigParamParent = currentConfigParamGrandParent.SUBCONTAINERS[k];
+
+                    // foreach (var currentConfigParamChild in currentConfigParamParent.SUBCONTAINERS)
+                    for (int i = 0; i < currentConfigParamParent.SUBCONTAINERS.Length; i++)
+                    {
+                        if (currentConfigParamParent.SUBCONTAINERS[i].PARAMETERVALUES.DEFINITIONREF.name.Equals(key, StringComparison.OrdinalIgnoreCase))
+                        {
+                            obj = currentConfigParamParent;
+                            isObjectFound = true;
+                            break;
+                        }
+                    }
+                    // if obj found, break out of all loops
+                    if (isObjectFound) break;
+                }
+                // if obj found, break out of all loops
+                if (isObjectFound) break;
+            }
+
+            return obj;
+        }
+
+        private void SaveBtn_Click(object sender, RoutedEventArgs e)
+        {
+            GetUpdatedValuesForConfigGeneration();
+            DockingManagerModelHelper.UpdateARXML();
+            MessageBox.Show("ARXML Successfully saved at following path : " + DockingManagerModelHelper.TargetOutputFolderPath);
+        }
+
+        private void LoadDefaultConfigBtn_Click(object sender, RoutedEventArgs e)
+        {
+            DockingManagerModelHelper.Configuration = DockingManagerModelHelper.LoadARXML(true);
+            PopulateWorkspaceExplorer();
+            CreateDynamicWPFGridForModule();
+        }
+    }
+}

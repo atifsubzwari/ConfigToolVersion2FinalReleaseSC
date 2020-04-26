@@ -1,0 +1,204 @@
+﻿<!--Using Syncfusion's ChromlessWindow for applying custom skins-->
+<Window
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
+  x:Class="ConfigGenerator.DockingManagerWindow"
+  xmlns:self="clr-namespace:ConfigGenerator"
+  WindowStartupLocation="CenterScreen" WindowState="Maximized" Style="{StaticResource windowStyle}"
+  Icon="..\Images\niyatalogofinal_icon.ico" 
+  x:Name="dockingmanagerwindow" 
+  Title="Configuration Generator" Height="820" Width="1950">
+
+    <!--Defining Root Grid -->
+    <Grid syncfusion:SkinStorage.VisualStyle="Office2007Blue" Margin="5,0,5,5" >
+        <Grid.RowDefinitions>
+            <RowDefinition Height="25"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header Area -->
+        <Grid Name="MenuGrid" VerticalAlignment="Stretch" Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="0.265*"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Menu Items area -->
+            <Menu VerticalAlignment="Center" HorizontalContentAlignment="Center" Margin="0">
+                <!--Windows Menu-->
+                <MenuItem Header="Open">
+                    <MenuItem Header="ARXML File" Click="OpenBtn_Click" />
+                    <MenuItem Header="DBC File" Click="OpenBtn_Click" />
+                    <MenuItem Header="Config (.H) File" Click="OpenBtn_Click" />
+                </MenuItem>
+
+                <!--Options Menu-->
+                <MenuItem Header="Project">
+                    <MenuItem Header="Load Default Config File" Click="LoadDefaultConfigBtn_Click" />
+                   
+                    <MenuItem Header="Validate Changes" Click="ValidateBtn_Click" />
+                    <MenuItem Header="Genarate Output Files" Click="GenerateBtn_Click" />
+                 
+                    <MenuItem Header="Save ARXML File" Click="SaveBtn_Click" />
+                </MenuItem>
+                <!--Options Menu-->
+                <MenuItem Header="Can Manager Project">
+                   
+                    <MenuItem Header="Load DBC File" Click="LoadDBCBtn_Click" />
+                     <MenuItem Header="Genarate  Can Manager Output Files" Click="GenerateCanMgrBtn_Click" />
+                    <MenuItem Header="Genarate Can Interface Output Files" Click="GenerateBtnCanIf_Click" />
+                    <MenuItem Header="Save Configuration" Click="SaveCanMgrConfig_Click" />
+
+                </MenuItem>
+            </Menu>
+
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom"  Orientation="Horizontal" FocusManager.IsFocusScope="True" Margin="0,0,0.2,-0.4" Grid.Column="1">
+                <!--Minimize Button-->
+                <Button Name="minimize"  Visibility="{Binding Path=IsEnabled,
+                            RelativeSource={RelativeSource Self}, Converter={StaticResource BooleanToVisibility}}"  
+							Command="{x:Static syncfusion:DocumentContainer.MinimizeDocumentCommand}" 
+                                CommandTarget="{Binding Path=ActiveDocument, ElementName=DocContainer}">
+                    <Image Source="{StaticResource minimizeBlue}" Height="16" Width="16"></Image>
+                </Button>
+
+                <!--Restore Button-->
+                <Button Name="Restore" BorderThickness="1" BorderBrush="Black" 
+                                Visibility="{Binding Path=IsEnabled, RelativeSource={RelativeSource Self}, 
+                            Converter={StaticResource BooleanToVisibility}}" 
+                                Command="{x:Static syncfusion:DocumentContainer.RestoreDocumentCommand}" 
+                                CommandTarget="{Binding Path=ActiveDocument, ElementName=DocContainer}">
+                    <Image Source="{StaticResource restoreBlue}" Height="16" Width="16"></Image>
+                </Button>
+
+                <!--Close Button-->
+                <Button Name="Close1"  Visibility="{Binding Path=IsEnabled, 
+                            RelativeSource={RelativeSource Self}, Converter={StaticResource BooleanToVisibility}}"
+							Command="{x:Static syncfusion:DocumentContainer.HideDocumentCommand}"
+                            CommandTarget="{Binding Path=ActiveDocument, ElementName=DocContainer}">
+                    <Image Source="{StaticResource closeBlue}" Height="16" Width="16"></Image>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!--Dock Window Area-->
+        <syncfusion:DockingManager Grid.Row="1" x:Name="DockingManager" PersistState="False" LayoutUpdated="DockingManager_LayoutUpdated"
+                                   UseInteropCompatibilityMode="False" UseDocumentContainer="True"
+                                   CloseAllTabs="DockingManager_CloseAllTabs" IsVS2010DraggingEnabled="True"
+                                   CloseOtherTabs="DockingManager_CloseOtherTabs" EnableMouseHoverBackground="False"
+                                   ShowTabItemContextMenu="{Binding ElementName=showtabitemcontextmenu, Path=IsChecked}"
+                                   ShowTabListContextMenu="{Binding ElementName=showtablistcontextmenu, Path=IsChecked}"
+                                   IsSelectedDocument="DockingManager_IsSelectedDocument"
+                                   IsAnimationEnabledOnMouseOver="{Binding ElementName=AutoHide,Path=IsChecked}"
+                                   EnableSnappingFloatWindow="{Binding ElementName=SnapFloat,Path=IsChecked}">
+
+            <!-- Icons for each of the tabs -->
+            <syncfusion:DockingManager.Icon>
+                <ImageBrush ImageSource="..\Images\Tab_Icon_18px.PNG"/>
+            </syncfusion:DockingManager.Icon>
+
+            <!-- WorkspacesExplorer dock window -->
+            <ContentControl Name="WorkspacesExplorer"
+					  syncfusion:DockingManager.Header="Workspaces Explorer"
+					  syncfusion:DockingManager.SideInDockedMode="Left"
+					  syncfusion:DockingManager.DesiredWidthInDockedMode="300" />
+
+            <!-- Dynamic Can dock window -->
+            <ContentControl Name="CanIf" ScrollViewer.VerticalScrollBarVisibility="Visible"
+					  syncfusion:DockingManager.Header="Can Interface"
+					  syncfusion:DockingManager.State="Document" 
+					  syncfusion:DockingManager.CanDock="False"
+					  syncfusion:DockingManager.CanFloat="False"
+                      syncfusion:DocumentContainer.MDIBounds="0,0,300,300">
+                <Grid ScrollViewer.VerticalScrollBarVisibility="Visible">
+                    <ScrollViewer VerticalScrollBarVisibility ="Auto">
+                        <StackPanel Orientation="Horizontal" Name="SpForDynamicGridIf" CanVerticallyScroll="True" >
+                            <Grid x:Name="GridInsideStackPanelIf" Grid.Row="2" Grid.Column="0" ScrollViewer.VerticalScrollBarVisibility="Visible">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </ContentControl>
+
+            <!-- Static Can dock window -->
+            <ContentControl Name="StaticCan"
+					  syncfusion:DockingManager.Header="CAN Manager"
+					  syncfusion:DockingManager.State="Document"
+					  syncfusion:DockingManager.CanDock="False"
+					  syncfusion:DockingManager.CanFloat="False"
+                      syncfusion:DocumentContainer.MDIBounds="0,0,400,400" >
+
+                <Grid ScrollViewer.VerticalScrollBarVisibility="Visible">
+                    <ScrollViewer VerticalScrollBarVisibility ="Auto">
+                        <StackPanel Orientation="Horizontal" Name="SpForDynamicGridStaticCan" CanVerticallyScroll="True" >
+                            <Grid x:Name="GridInsideStackPanelStaticCan" Grid.Row="2" Grid.Column="0" ScrollViewer.VerticalScrollBarVisibility="Visible">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </ContentControl>
+
+            <!-- Dynamic Can dock window -->
+            <ContentControl Name="Can" ScrollViewer.VerticalScrollBarVisibility="Visible"
+					  syncfusion:DockingManager.Header="Can Driver"
+					  syncfusion:DockingManager.State="Document" 
+					  syncfusion:DockingManager.CanDock="False"
+					  syncfusion:DockingManager.CanFloat="False"
+                      syncfusion:DocumentContainer.MDIBounds="0,0,300,300">
+                <Grid ScrollViewer.VerticalScrollBarVisibility="Visible">
+                    <ScrollViewer VerticalScrollBarVisibility ="Auto">
+                        <StackPanel Orientation="Horizontal" Name="SpForDynamicGrid" CanVerticallyScroll="True" >
+                            <Grid x:Name="GridInsideStackPanel" Grid.Row="2" Grid.Column="0" ScrollViewer.VerticalScrollBarVisibility="Visible">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </ContentControl>
+            
+            <!-- Output dock window -->
+            <ContentControl Name="Output"
+						   syncfusion:DockingManager.Header="Output"
+						   syncfusion:DockingManager.SideInDockedMode="Bottom"
+						   syncfusion:DockingManager.DesiredHeightInDockedMode="200" 
+						   >
+                <syncfusion:DockingManager.Icon>
+                    <ImageBrush ImageSource="..\Images\Output.png" />
+                </syncfusion:DockingManager.Icon>
+                <ScrollViewer VerticalScrollBarVisibility ="Auto" Name ="Scroll">
+                    <TextBlock Name="Log" >  
+					<!-- Context menu for clear the event -->
+                        <TextBlock.ContextMenu>
+                            <ContextMenu Name="cm">
+                                <MenuItem Header="Clear" Click="OnClear"/>
+                            </ContextMenu>
+                        </TextBlock.ContextMenu>
+                    </TextBlock>
+                </ScrollViewer>
+            </ContentControl>
+
+            <!-- ErrorList dock window -->
+            <ContentControl Name="ErrorList"
+						   syncfusion:DockingManager.Header="Error List"
+						   syncfusion:DockingManager.SideInDockedMode="Tabbed"
+						   syncfusion:DockingManager.TargetNameInDockedMode="Output" >
+                <syncfusion:DockingManager.Icon>
+                    <ImageBrush ImageSource="..\Images\ErrorList.png" />
+                </syncfusion:DockingManager.Icon>
+            </ContentControl>
+
+        </syncfusion:DockingManager>
+    </Grid>
+
+</Window>

@@ -1,0 +1,444 @@
+VERSION ""
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: EMS BCM Logger PMU
+VAL_TABLE_ EngineStopReq 1 "Engine Stop Request" 0 "No Request" ;
+VAL_TABLE_ CrankRequest 1 "Crank Requested" 0 "No Request" ;
+VAL_TABLE_ CrankInhibit 1 "Crank Inhibited" 0 "Crank Enabled" ;
+VAL_TABLE_ VehPowerState 7 "EMERGENCY_STOP" 6 "VEHICLE_SHUTDOWN" 5 "FAULT" 4 "ENGINE_STOP_REQ" 3 "ENGINE_RUNNING" 2 "ENGINE_CRANKING" 1 "EXTERNAL_CHARGING" 0 "IGNITION_ON" ;
+VAL_TABLE_ VehicleShutdownReq 1 "Shutdown Requested" 0 "No Request" ;
+VAL_TABLE_ ReverseSwitchState 1 "Reverse Engaged" 0 "Reverse NOT Engaged" ;
+VAL_TABLE_ ShutdownOK 1 "Shutdown OK" 0 "Not OK" ;
+VAL_TABLE_ ParkBrakeState 2 "Park brake Released" 1 "Park brake ON" 0 "Undefined" ;
+VAL_TABLE_ GearPos 8 "Reverse" 7 "Neutral" 6 "6th gear" 5 "5th gear" 4 "4th gear" 3 "3rd gear" 2 "2nd gear" 1 "1st gear" 0 "Not known" ;
+VAL_TABLE_ DriveMode 1 "Sport" 0 "Normal" ;
+VAL_TABLE_ ActivityState 1 "Active" 0 "Inactive" ;
+VAL_TABLE_ ISGState 5 "FAULT" 4 "VOLTAGE_MODE" 3 "SPEED_MODE" 2 "READY" 1 "INIT" 0 "OFF" ;
+VAL_TABLE_ OffOn 1 "On" 0 "Off" ;
+VAL_TABLE_ CrankCmd 1 "Initiate Crank" 0 "No Cmd" ;
+VAL_TABLE_ EngineState 6 "FAULT" 5 "SHUTTING_DOWN" 4 "STALLED" 3 "RUNNING" 2 "CRANKING" 1 "READY" 0 "OFF" ;
+VAL_TABLE_ PMUState 7 "not used" 6 "FAULT" 5 "ON_STATUS_CHECK" 4 "EXT_CHARGING_12V" 3 "CHARGING_48V" 2 "DISCHARGING_48V" 1 "ON" 0 "OFF" ;
+VAL_TABLE_ DCDCSwitchContStatus 3 "Fault" 2 "Closed" 1 "Open" 0 "Undefined" ;
+VAL_TABLE_ DCDCSwitchReq 2 "Closed" 1 "Open" 0 "Undefined" ;
+VAL_TABLE_ DCDCStatus 4 "Fault" 3 "Boost" 2 "Buck" 1 "Off" 0 "Undefined" ;
+VAL_TABLE_ CellsBalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+
+
+BO_ 3221225472 VECTOR__INDEPENDENT_SIG_MSG: 0 Vector__XXX
+ SG_ Batt48VCell3BalStatus : 0|2@0+ (1,0) [0|3] "-" Vector__XXX
+ SG_ Batt48VCell3Imbal : 0|7@0+ (0.1,0) [0|12] "%" Vector__XXX
+ SG_ Batt48VCell3SoHRes : 0|6@0+ (1,90) [90|150] "%" Vector__XXX
+ SG_ Batt48VCell3SoHCap : 0|6@0+ (1,65) [65|125] "%" Vector__XXX
+ SG_ Batt48VCell3DoD : 0|8@0+ (0.02,0) [0|5.1] "Ah" Vector__XXX
+ SG_ Batt48VCell3SoC : 0|8@0+ (0.5,0) [0|100] "%" Vector__XXX
+ SG_ Batt48VCell3Volt : 0|11@0+ (0.001,1.8) [1.8|3.8] "V" Vector__XXX
+
+BO_ 1554 GearboxInfo: 8 BCM
+ SG_ PrimaryShaftSpeed : 55|11@0+ (10,0) [0|20470] "-"  Logger
+ SG_ OilCoolerOutTemp : 47|8@0+ (1,-40) [-40|215] "�C"  Logger
+ SG_ OilCoolerOutPress : 37|6@0+ (0.01,0.7) [0.7|1.33] "bar"  Logger
+ SG_ OilCoolerInTemp : 31|8@0+ (1,-40) [-40|215] "�C"  Logger
+ SG_ OilCoolerInPress : 21|6@0+ (0.01,0.7) [0.7|1.33] "bar"  Logger
+ SG_ GrbxOilTemp : 15|8@0+ (1,-40) [-40|215] "�C"  Logger
+ SG_ BellhousingAirTemp : 7|8@0+ (1,-40) [-40|215] "�C"  Logger
+
+BO_ 1553 OilTankInfo: 3 BCM
+ SG_ OilTankTemp : 23|8@0+ (1,-40) [-40|215] "�C"  Logger
+ SG_ OilTankPress : 13|6@0+ (0.01,0.7) [0.7|1.33] "bar"  Logger
+ SG_ OilTankLevel : 6|7@0+ (1,0) [0|100] "%"  Logger
+
+BO_ 1552 EMSInfo2: 7 EMS
+ SG_ FuelTankLevel : 54|7@0+ (1,0) [0|100] "%"  Logger,BCM
+ SG_ FuelTankPress : 45|6@0+ (0.01,0.7) [0.7|1.33] "bar"  Logger,BCM
+ SG_ EngineSpeed : 31|11@0+ (10,0) [0|20470] "-"  Logger,BCM
+ SG_ EISB2State : 21|3@0+ (1,0) [0|7] "-"  Logger,BCM
+ SG_ EISB1State : 18|3@0+ (1,0) [0|7] "-"  Logger,BCM
+ SG_ AirInManTemp : 14|7@0+ (1,-40) [-40|85] "�C"  Logger,BCM
+ SG_ AirInManPress : 7|8@0+ (0.01,0.5) [0.5|3.05] "bar"  Logger,BCM
+
+BO_ 1843 Batt48VCell14Param: 6 PMU
+ SG_ Batt48VCell14Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell14SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell14SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell14SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell14Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell14DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell14BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1842 Batt48VCell13Param: 6 PMU
+ SG_ Batt48VCell13Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell13SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell13SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell13SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell13Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell13DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell13BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1841 Batt48VCell12Param: 6 PMU
+ SG_ Batt48VCell12Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell12SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell12SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell12SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell12Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell12DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell12BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1840 Batt48VCell11Param: 6 PMU
+ SG_ Batt48VCell11Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell11SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell11SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell11SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell11Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell11DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell11BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1839 Batt48VCell10Param: 6 PMU
+ SG_ Batt48VCell10Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell10SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell10SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell10SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell10Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell10DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell10BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1838 Batt48VCell9Param: 6 PMU
+ SG_ Batt48VCell9Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell9SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell9SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell9SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell9Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell9DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell9BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1837 Batt48VCell8Param: 6 PMU
+ SG_ Batt48VCell8Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell8SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell8SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell8SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell8Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell8DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell8BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1836 Batt48VCell7Param: 6 PMU
+ SG_ Batt48VCell7Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell7SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell7SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell7SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell7Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell7DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell7BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1835 Batt48VCell6Param: 6 PMU
+ SG_ Batt48VCell6Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell6SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell6SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell6SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell6Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell6DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell6BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1834 Batt48VCell5Param: 6 PMU
+ SG_ Batt48VCell5Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell5SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell5SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell5SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell5Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell5DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell5BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1833 Batt48VCell4Param: 6 PMU
+ SG_ Batt48VCell4Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell4SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell4SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell4SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell4Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell4DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell4BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1832 Batt48VCell3Param: 6 PMU
+ SG_ Batt48VCell13Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell13SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell13SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell13SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell13Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell13DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell13BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1831 Batt48VCell2Param: 6 PMU
+ SG_ Batt48VCell2Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell2SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell2SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell2SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell2Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell2DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell2BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1830 Batt48VCell1Param: 6 PMU
+ SG_ Batt48VCell1Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt48VCell1SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt48VCell1SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt48VCell1SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt48VCell1Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt48VCell1DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt48VCell1BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 832 VehicleInfo: 5 BCM
+ SG_ EngineStopRequested : 22|1@0+ (1,0) [0|1] "-" Vector__XXX
+ SG_ VehicleShutdownReq : 32|1@0+ (1,0) [0|1] "-"  EMS,PMU
+ SG_ ReverseSwitchState : 34|1@0+ (1,0) [0|1] "-"  EMS,PMU
+ SG_ VehiclePowerState : 19|4@0+ (1,0) [0|7] "-"  EMS,PMU
+ SG_ CrankRequested : 33|1@0+ (1,0) [0|1] "-"  EMS,PMU
+ SG_ ParkBrakeState : 21|2@0+ (1,0) [0|2] "-"  EMS,PMU
+ SG_ InertiaSwitchState : 7|1@0+ (1,0) [0|1] "-"  EMS,PMU
+ SG_ EmergencySwitchState : 15|1@0+ (1,0) [0|1] "-"  EMS,PMU
+ SG_ DriveMode : 23|1@0+ (1,0) [0|1] "-"  EMS,PMU
+ SG_ CoolantTemp : 31|8@0+ (1,-40) [-40|215] "�C"  EMS,PMU
+ SG_ BrakePedalPos : 14|7@0+ (1,0) [0|100] "%"  EMS,PMU
+ SG_ AmbientTemp : 6|7@0+ (1,-40) [-40|85] "�C"  EMS,PMU
+
+BO_ 833 WheelSpeeds: 5 BCM
+ SG_ WheelSpeedRearRight : 11|12@0+ (1,0) [0|4095] "rpm"  EMS
+ SG_ WheelSpeedRearLeft : 7|12@0+ (1,0) [0|4095] "rpm"  EMS
+ SG_ VehicleSpeed : 31|11@0+ (0.1,0) [0|204.7] "mph"  EMS
+
+BO_ 800 ISGInfo: 3 BCM
+ SG_ ISGTorqueEst : 7|11@0+ (0.1,-85) [-85|119.7] "Nm"  EMS,PMU
+ SG_ ISGState : 10|3@0+ (1,0) [0|5] "-"  EMS,PMU
+
+BO_ 785 EMSAuxCmds: 8 EMS
+ SG_ FuelPump2Cmd : 22|7@0+ (1,0) [0|100] "%"  BCM
+ SG_ FuelPump1Cmd : 14|7@0+ (1,0) [0|100] "%"  BCM
+
+BO_ 784 EMSInfo1: 6 EMS
+ SG_ ISGTorqueMinSlewRate : 7|9@0+ (1,0) [0|500] "Nm/s"  PMU,BCM
+ SG_ ISGTorqueMaxSlewRate : 47|8@0+ (1,0) [0|255] "Nm/s"  PMU,BCM
+ SG_ ISGTorqueAvailable : 39|7@0+ (1,0) [0|127] "Nm"  PMU,BCM
+ SG_ ISGSpeedSetpoint : 23|11@0+ (1,0) [0|2047] "rpm"  PMU,BCM
+ SG_ ISGMinTorque : 14|7@0+ (1,0) [0|127] "Nm"  PMU,BCM
+ SG_ EngineState : 28|3@0+ (1,0) [0|6] "-"  PMU,BCM
+ SG_ CrankCmd : 32|1@0+ (1,0) [0|1] "-"  PMU,BCM
+
+BO_ 1297 Batt48VInfo: 8 PMU
+ SG_ Batt48VTempMin : 30|7@0+ (1,-40) [-40|85] "�C"  EMS,BCM
+ SG_ Batt48VTempMax : 21|7@0+ (1,-40) [-40|85] "�C"  EMS,BCM
+ SG_ Batt48VTempAvrg : 12|7@0+ (1,-40) [-40|85] "�C"  EMS,BCM
+ SG_ Batt48VSoC : 55|8@0+ (0.5,0) [0|100] "%"  EMS,BCM
+ SG_ Batt48VEstimated : 39|12@0+ (0.01,22.4) [22.4|53.2] "V"  EMS,BCM
+ SG_ Batt48VCurrMeas : 7|11@0+ (0.5,0) [0|600] "A"  EMS,BCM
+
+BO_ 1296 Batt12VInfo: 8 PMU
+ SG_ Batt12VTempMin : 54|7@0+ (1,-40) [-40|85] "�C"  BCM
+ SG_ Batt12VTempMax : 22|7@0+ (1,-40) [-40|85] "�C"  BCM
+ SG_ Batt12VTempAvrg : 13|7@0+ (1,-40) [-40|85] "�C"  BCM
+ SG_ Batt12VSoC : 47|8@0+ (0.5,0) [0|100] "%"  BCM
+ SG_ Batt12VEstimated : 31|10@0+ (0.01,6.4) [6.4|15.2] "V"  BCM
+ SG_ Batt12VCurrMeas : 7|10@0+ (0.2,0) [0|200] "A"  BCM
+
+BO_ 881 PMUStatus: 4 PMU
+ SG_ PMUCrankInhibit : 15|1@0+ (1,0) [0|1] "-" Vector__XXX
+ SG_ PMUShutdownOK : 7|1@0+ (1,0) [0|1] "-"  EMS,BCM
+ SG_ ISGVoltSetpoint : 6|7@0+ (0.1,40.4) [40.4|50.4] "V"  EMS,BCM
+ SG_ ISGVoltMin : 23|8@0+ (0.1,28) [28|50.4] "V"  EMS,BCM
+ SG_ ISGVoltMax : 14|7@0+ (0.1,40.4) [40.4|50.4] "V"  EMS,BCM
+ SG_ PMUState : 26|3@0+ (1,0) [0|7] "-"  EMS,BCM
+
+BO_ 1844 Batt48VTemps: 7 PMU
+ SG_ Batt48VTempMeas7 : 54|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt48VTempMeas6 : 46|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt48VTempMeas5 : 38|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt48VTempMeas4 : 30|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt48VTempMeas3 : 22|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt48VTempMeas2 : 14|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt48VTempMeas1 : 6|7@0+ (1,-40) [-40|85] "�C"  Logger
+
+BO_ 1847 BattLimits: 8 PMU
+ SG_ Batt48VMaxDischrgCurr : 33|10@0+ (1,0) [0|600] "A"  Logger
+ SG_ Batt48VMaxChrgCurr : 39|6@0+ (1,0) [0|50] "A"  Logger
+ SG_ Batt12VMin : 31|7@0+ (0.1,6.4) [6.4|15.2] "V"  Logger
+ SG_ Batt12VMaxDischrgCurr : 23|8@0+ (1,0) [0|150] "A"  Logger
+ SG_ Batt12VMaxChrgCurr : 15|5@0+ (1,0) [0|30] "A"  Logger
+ SG_ Batt12VMax : 7|7@0+ (0.1,6.4) [6.4|15.2] "V"  Logger
+
+BO_ 1846 DCDC48VInfo: 5 PMU
+ SG_ Batt48VContStatus : 9|2@0+ (1,0) [0|3] "-"  Logger
+ SG_ DCDC48VSwitchStatus : 11|2@0+ (1,0) [0|3] "-"  Logger
+ SG_ DCDC48VSwitchReq : 13|2@0+ (1,0) [0|2] "-"  Logger
+ SG_ DCDC48VoltSetpoint : 39|7@0+ (0.1,40) [40|50.4] "V"  Logger
+ SG_ DCDC48VoltMeas : 23|12@0+ (0.01,22.4) [22.4|53.2] "V"  Logger
+ SG_ DCDC48VCurrMeas : 7|10@0+ (0.1,0) [0|90] "A"  Logger
+
+BO_ 1845 DCDC12VInfo: 5 PMU
+ SG_ Batt12VContStatus : 35|2@0+ (1,0) [0|3] "-"  Logger
+ SG_ DCDCStatus : 12|3@0+ (1,0) [0|4] "-"  Logger
+ SG_ DCDC12VSwitchStatus : 9|2@0+ (1,0) [0|3] "-"  Logger
+ SG_ DCDC12VSwitchReq : 33|2@0+ (1,0) [0|2] "-"  Logger
+ SG_ DCDC12VoltSetpoint : 29|6@0+ (0.1,8) [8|14.3] "V"  Logger
+ SG_ DCDC12VoltMeas : 23|10@0+ (0.01,6.4) [6.4|15.2] "V"  Logger
+ SG_ DCDC12VCurrMeas : 7|11@0+ (0.1,0) [0|200] "A"  Logger
+
+BO_ 1828 Batt12VCell4Param: 6 PMU
+ SG_ Batt12VCell4Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt12VCell4SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt12VCell4SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt12VCell4SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt12VCell4Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt12VCell4DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt12VCell4BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1827 Batt12VCell3Param: 6 PMU
+ SG_ Batt12VCell3Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt12VCell3SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt12VCell3SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt12VCell3SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt12VCell3Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt12VCell3DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt12VCell3BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1826 Batt12VCell2Param: 6 PMU
+ SG_ Batt12VCell2Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt12VCell2Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt12VCell2SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt12VCell2SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt12VCell2SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt12VCell2DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+ SG_ Batt12VCell2BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+
+BO_ 1829 Batt12VTemps: 7 PMU
+ SG_ Batt12VTempMeas7 : 54|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt12VTempMeas6 : 46|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt12VTempMeas5 : 38|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt12VTempMeas4 : 30|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt12VTempMeas3 : 22|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt12VTempMeas2 : 14|7@0+ (1,-40) [-40|85] "�C"  Logger
+ SG_ Batt12VTempMeas1 : 6|7@0+ (1,-40) [-40|85] "�C"  Logger
+
+BO_ 1825 Batt12VCell1Param: 6 PMU
+ SG_ Batt12VCell1Imbal : 25|7@0+ (0.1,0) [0|12] "%"  Logger
+ SG_ Batt12VCell1BalStatus : 23|2@0+ (1,0) [0|3] "-"  Logger
+ SG_ Batt12VCell1Volt : 34|11@0+ (0.001,1.8) [1.8|3.8] "V"  Logger
+ SG_ Batt12VCell1SoHRes : 31|6@0+ (1,90) [90|150] "%"  Logger
+ SG_ Batt12VCell1SoHCap : 21|6@0+ (1,65) [65|125] "%"  Logger
+ SG_ Batt12VCell1SoC : 7|8@0+ (0.5,0) [0|100] "%"  Logger
+ SG_ Batt12VCell1DoD : 15|8@0+ (0.02,0) [0|5.1] "Ah"  Logger
+
+
+
+CM_ BO_ 3221225472 "This is a message for not used signals, created by Vector CANdb++ DBC OLE DB Provider.";
+BA_DEF_ BU_  "NmStationAddress" HEX 0 0;
+BA_DEF_ SG_  "GenSigInactiveValue" INT 0 0;
+BA_DEF_ BO_  "GenMsgSendType" ENUM  "Cyclic";
+BA_DEF_ BO_  "GenMsgCycleTime" INT 0 0;
+BA_DEF_  "BusType" STRING ;
+BA_DEF_DEF_  "NmStationAddress" 0;
+BA_DEF_DEF_  "GenSigInactiveValue" 0;
+BA_DEF_DEF_  "GenMsgSendType" "Cyclic";
+BA_DEF_DEF_  "GenMsgCycleTime" 0;
+BA_DEF_DEF_  "BusType" "CAN";
+BA_ "GenMsgCycleTime" BO_ 1554 100;
+BA_ "GenMsgCycleTime" BO_ 1553 100;
+BA_ "GenMsgCycleTime" BO_ 1552 100;
+BA_ "GenMsgCycleTime" BO_ 1843 100;
+BA_ "GenMsgCycleTime" BO_ 1842 100;
+BA_ "GenMsgCycleTime" BO_ 1841 100;
+BA_ "GenMsgCycleTime" BO_ 1840 100;
+BA_ "GenMsgCycleTime" BO_ 1839 100;
+BA_ "GenMsgCycleTime" BO_ 1838 100;
+BA_ "GenMsgCycleTime" BO_ 1837 100;
+BA_ "GenMsgCycleTime" BO_ 1836 100;
+BA_ "GenMsgCycleTime" BO_ 1835 100;
+BA_ "GenMsgCycleTime" BO_ 1834 100;
+BA_ "GenMsgCycleTime" BO_ 1833 100;
+BA_ "GenMsgCycleTime" BO_ 1832 100;
+BA_ "GenMsgCycleTime" BO_ 1831 100;
+BA_ "GenMsgCycleTime" BO_ 1830 100;
+BA_ "GenMsgCycleTime" BO_ 832 20;
+BA_ "GenMsgCycleTime" BO_ 833 20;
+BA_ "GenMsgCycleTime" BO_ 800 10;
+BA_ "GenMsgCycleTime" BO_ 785 20;
+BA_ "GenMsgCycleTime" BO_ 784 10;
+BA_ "GenMsgCycleTime" BO_ 1297 100;
+BA_ "GenMsgCycleTime" BO_ 1296 100;
+BA_ "GenMsgCycleTime" BO_ 881 50;
+BA_ "GenMsgCycleTime" BO_ 1844 500;
+BA_ "GenMsgCycleTime" BO_ 1847 100;
+BA_ "GenMsgCycleTime" BO_ 1846 100;
+BA_ "GenMsgCycleTime" BO_ 1845 100;
+BA_ "GenMsgCycleTime" BO_ 1828 100;
+BA_ "GenMsgCycleTime" BO_ 1827 100;
+BA_ "GenMsgCycleTime" BO_ 1826 100;
+BA_ "GenMsgCycleTime" BO_ 1829 500;
+BA_ "GenMsgCycleTime" BO_ 1825 100;
+VAL_ 3221225472 Batt48VCell3BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1843 Batt48VCell14BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1842 Batt48VCell13BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1841 Batt48VCell12BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1840 Batt48VCell11BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1839 Batt48VCell10BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1838 Batt48VCell9BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1837 Batt48VCell8BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1836 Batt48VCell7BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1835 Batt48VCell6BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1834 Batt48VCell5BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1833 Batt48VCell4BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1832 Batt48VCell13BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1831 Batt48VCell2BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1830 Batt48VCell1BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 832 EngineStopRequested 1 "Engine Stop Request" 0 "No Request" ;
+VAL_ 832 VehicleShutdownReq 1 "Shutdown Requested" 0 "No Request" ;
+VAL_ 832 ReverseSwitchState 1 "Reverse Engaged" 0 "Reverse NOT Engaged" ;
+VAL_ 832 VehiclePowerState 7 "EMERGENCY_STOP" 6 "VEHICLE_SHUTDOWN" 5 "FAULT" 4 "ENGINE_STOP_REQ" 3 "ENGINE_RUNNING" 2 "ENGINE_CRANKING" 1 "EXTERNAL_CHARGING" 0 "IGNITION_ON" ;
+VAL_ 832 CrankRequested 1 "Crank Requested" 0 "No Request" ;
+VAL_ 832 ParkBrakeState 2 "Park brake Released" 1 "Park brake ON" 0 "Undefined" ;
+VAL_ 832 InertiaSwitchState 1 "Active" 0 "Inactive" ;
+VAL_ 832 EmergencySwitchState 1 "Active" 0 "Inactive" ;
+VAL_ 832 DriveMode 1 "Sport" 0 "Normal" ;
+VAL_ 800 ISGState 5 "FAULT" 4 "VOLTAGE_MODE" 3 "SPEED_MODE" 2 "READY" 1 "INIT" 0 "OFF" ;
+VAL_ 784 EngineState 6 "FAULT" 5 "SHUTTING_DOWN" 4 "STALLED" 3 "RUNNING" 2 "CRANKING" 1 "READY" 0 "OFF" ;
+VAL_ 784 CrankCmd 1 "Initiate Crank" 0 "No Cmd" ;
+VAL_ 881 PMUCrankInhibit 1 "Crank Inhibited" 0 "Crank Enabled" ;
+VAL_ 881 PMUShutdownOK 1 "Shutdown OK" 0 "Not OK" ;
+VAL_ 881 PMUState 7 "not used" 6 "FAULT" 5 "ON_STATUS_CHECK" 4 "EXT_CHARGING_12V" 3 "CHARGING_48V" 2 "DISCHARGING_48V" 1 "ON" 0 "OFF" ;
+VAL_ 1846 Batt48VContStatus 3 "Fault" 2 "Closed" 1 "Open" 0 "Undefined" ;
+VAL_ 1846 DCDC48VSwitchStatus 3 "Fault" 2 "Closed" 1 "Open" 0 "Undefined" ;
+VAL_ 1846 DCDC48VSwitchReq 2 "Closed" 1 "Open" 0 "Undefined" ;
+VAL_ 1845 Batt12VContStatus 3 "Fault" 2 "Closed" 1 "Open" 0 "Undefined" ;
+VAL_ 1845 DCDCStatus 4 "Fault" 3 "Boost" 2 "Buck" 1 "Off" 0 "Undefined" ;
+VAL_ 1845 DCDC12VSwitchStatus 3 "Fault" 2 "Closed" 1 "Open" 0 "Undefined" ;
+VAL_ 1845 DCDC12VSwitchReq 2 "Closed" 1 "Open" 0 "Undefined" ;
+VAL_ 1828 Batt12VCell4BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1827 Batt12VCell3BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1826 Batt12VCell2BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+VAL_ 1825 Batt12VCell1BalStatus 3 "Fault" 2 "Balancing" 1 "Not Balancing" 0 "Undefined" ;
+
